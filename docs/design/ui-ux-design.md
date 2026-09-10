@@ -16,6 +16,8 @@ Per the brief: build only —
 
 Explicitly **not** built this milestone (see brief for the full list): sale entry / stock depletion of any kind, eBay ingestion, pre-order/dropship state, consignment/consignor tracking, an export-to-Noctrowl screen, login/auth. This build is acquisition-only — purchases only ever increase on-hand stock.
 
+**Superseded 2026-09-10 (Milestone 5):** sale-side depletion (the "explicitly not built" item above) is now real, additional scope — see `docs/design/milestone-5-depletion-design.md` for the new Item Detail "Mark as Sold" action and the new Sales / Depletion Log screen. This document otherwise remains an accurate historical record of Milestone 1's own scope; the rest of its "acquisition-only" framing below describes that original milestone, not the system's current state.
+
 ## Shared chrome
 
 - **Top bar**: app name ("Alakazam") and a currency reminder badge ("All values shown in IDR (Rp)") — always visible, since this project explicitly cannot assume a single currency is safe to leave implicit (see CLAUDE.md's Currency section).
@@ -101,7 +103,7 @@ Rebuilt against the new model, same unmistakable visual treatment as before:
 
 Read-only, chronological, same shape as before, updated for the new model. **Table columns**: Date, Purchase Reference, Vendor/Description, Total Amount Paid, Line Count, a permanent green "Balanced" badge (every saved purchase was necessarily balanced at save time). **Row interaction**: click to expand inline (accordion) showing: a shipping-mode summary line ("Shipping: Pooled — Rp 350.000 split By Weight"), a lump-sum-group summary line if one was used, the **invoice attachment** (filename + Parsed/Needs Review badge + recap, or "No invoice / proof of transfer attached"), and a line-level table (SKU, Qty, Item Cost with its pricing-mode label, Shipping with its mode label, Line Total) plus, for any serialized lines, each assigned unit's serial ID, cost, and photo thumbnail if attached.
 
-**No edit/delete affordance** — unchanged reasoning from the original design (acquisition-only, no correction/reversal flow, not in scope).
+**No edit/delete affordance** — unchanged reasoning from the original design (no correction/reversal flow, not in scope; see `docs/design/milestone-5-depletion-design.md` for the same deliberate gap now also applying to posted depletion events).
 
 ## Design principles carried through every screen
 

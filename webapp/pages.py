@@ -36,3 +36,9 @@ def register_page_routes(app, templates: Jinja2Templates) -> None:
         return templates.TemplateResponse(
             request, "purchase_history.html", {"active_nav": "history", "auto_open_ref": ref}
         )
+
+    @app.get("/sales")
+    async def sales_log_page(request: Request, sku: str = ""):
+        return templates.TemplateResponse(
+            request, "sales_log.html", {"active_nav": "sales", "filter_sku": sku}
+        )

@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 # explicit list (not introspection) so drop_schema() can never accidentally
 # reach a database it shouldn't and drop something unexpected.
 _ALL_OBJECTS_NEWEST_FIRST = [
+    # Migration 003 (Milestone 5 — sale-side depletion)
+    ("TRIGGER", "trg_check_fungible_depletion_not_negative ON fungible_depletions"),
+    ("FUNCTION", "check_fungible_depletion_not_negative()"),
+    ("TABLE", "fungible_depletions"),
+    # Migration 001/002
     ("TRIGGER", "trg_check_purchase_has_lines ON purchases"),
     ("TRIGGER", "trg_check_purchase_reconciliation ON purchase_line_items"),
     ("FUNCTION", "check_purchase_has_lines()"),

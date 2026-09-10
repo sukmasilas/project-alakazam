@@ -20,6 +20,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.engine import Connection
 
+from inventory import depletions as depletions_engine
 from inventory import items as items_engine
 from inventory import purchases as purchases_engine
 from inventory import queries
@@ -28,7 +29,13 @@ from inventory import sku as sku_engine
 from inventory import uniqueness
 from inventory.exceptions import AlakazamError
 from webapp.dbdep import get_read_conn, get_write_conn
-from webapp.schemas import NewItemCreateIn, PurchaseIn, to_purchase_input
+from webapp.schemas import (
+    FungibleDepletionIn,
+    NewItemCreateIn,
+    PurchaseIn,
+    SerialDepletionIn,
+    to_purchase_input,
+)
 
 router = APIRouter(prefix="/api")
 
@@ -230,3 +237,50 @@ def api_save_purchase(body: PurchaseIn, conn: Connection = Depends(get_write_con
     except AlakazamError as exc:
         raise _error_response(exc) from exc
     return serialize(saved)
+
+
+# --------------------------------------------------------------------- #
+# Milestone 5 — sale-side depletion. Every endpoint here calls straight
+# into inventory.depletions — the real negative-stock guard (pre-check +
+# DB trigger / atomic UPDATE, see that module's docstring) is never
+# reimplemented at this layer. The server is always authoritative: a
+# client-supplied quantity/serial_id is never trusted beyond what these
+# real engine functions actually accept.
+# --------------------------------------------------------------------- #
+
+
+@router.post("/items/{sku}/deplete")
+def api_deplete_fungible(sku: str, body: FungibleDepletionIn, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = depletions_engine.deplete_fungible(
+            conn,
+            sku=sku,
+            quantity=body.quantity,
+            depletion_date=body.depletion_date,
+            reference=body.reference,
+        )
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+@router.post("/items/{sku}/serial-units/{serial_id}/deplete")
+def api_deplete_serial_unit(
+    sku: str, serial_id: str, body: SerialDepletionIn, conn: Connection = Depends(get_write_conn)
+):
+    try:
+        result = depletions_engine.deplete_serial_unit(
+            conn,
+            serial_id=serial_id,
+            expected_sku=sku,
+            sold_date=body.sold_date,
+            reference=body.reference,
+        )
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+@router.get("/depletions")
+def api_list_depletions(sku: Optional[str] = None, conn: Connection = Depends(get_read_conn)):
+    return serialize(queries.list_depletions(conn, sku=sku))

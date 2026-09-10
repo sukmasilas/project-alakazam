@@ -1,6 +1,21 @@
 """Read-side helpers: resolving categories/items, and the on-hand
 quantity/cost rollups described in CLAUDE.md's brief ("On-hand quantity/cost
-computation"). Acquisition-only — no depletion logic anywhere here.
+computation").
+
+Milestone 5 update: on-hand quantity/cost is no longer acquisition-only.
+``get_item_stats`` now nets total purchased against total depleted (see
+``inventory/depletions.py``) for BOTH identity modes — a fungible item's
+on-hand figures subtract ``fungible_depletions``, a serialized item's
+on-hand figures only count ``serial_units`` still ``status = 'on_hand'``.
+Every caller of ``get_item_stats``/``get_category_stats`` (the Inventory
+table, Item Detail, category rollups) picks this up for free, with no
+caller-side changes needed, since they never computed on-hand figures
+themselves — they always deferred to this module. The one place that
+deliberately does NOT reflect depletion is ``get_fungible_purchase_rows`` /
+``get_purchase_detail`` (Purchase History, and Item Detail's per-purchase
+breakdown) — a purchase's own recorded line figures are historical fact and
+must never change because of a later, separate depletion event (see
+CLAUDE.md's brief and ``docs/design/milestone-5-depletion-design.md``).
 
 Milestone 3 (web app) note: everything below ``get_category_stats`` (the
 original Milestone 2 boundary) is a Milestone-3 addition — plain read-only
@@ -9,6 +24,10 @@ rows, purchase-ledger rows) for the real screens to render. None of it
 computes money — allocation math stays exclusively in
 ``inventory/allocation.py`` / ``inventory/purchases.py``; these functions
 only ever select and shape already-posted, already-computed columns.
+``list_depletions`` (Milestone 5) follows the same rule — it reads
+``fungible_depletions``/``serial_units`` verbatim, the real cost figures
+were already computed once, at depletion time, by
+``inventory/depletions.py``.
 """
 from __future__ import annotations
 
@@ -88,9 +107,16 @@ class ItemStats:
 
 
 def get_item_stats(conn: Connection, sku: str) -> ItemStats:
-    """For a fungible item: sum of quantity and allocated cost (item cost +
-    shipping share) across every purchase line for this item. For a
-    serialized item: count and cost-sum over its serial units.
+    """Current ON-HAND quantity and cost basis (Milestone 5: purchased
+    minus depleted, not just purchased — see module docstring).
+
+    For a fungible item: total purchased quantity/cost (item cost +
+    shipping share, summed across every purchase line for this item) minus
+    total depleted quantity/cost (``fungible_depletions`` — see
+    ``inventory/depletions.py``). For a serialized item: count and
+    cost-sum over only the serial units still ``status = 'on_hand'`` (a
+    ``status = 'sold'`` unit's own ``acquired_cost`` is simply excluded,
+    not subtracted after the fact — same end result, simpler query).
     """
     item = get_item_by_sku(conn, sku)
     if item is None:
@@ -100,20 +126,29 @@ def get_item_stats(conn: Connection, sku: str) -> ItemStats:
         row = conn.execute(
             text(
                 "SELECT COUNT(*), COALESCE(SUM(acquired_cost), 0) "
-                "FROM serial_units WHERE item_id = :item_id"
+                "FROM serial_units WHERE item_id = :item_id AND status = 'on_hand'"
             ),
             {"item_id": item.id},
         ).first()
         return ItemStats(item=item, quantity=int(row[0]), cost_basis=Decimal(row[1]))
 
-    row = conn.execute(
+    purchased_row = conn.execute(
         text(
             "SELECT COALESCE(SUM(quantity), 0), COALESCE(SUM(line_total), 0) "
             "FROM purchase_line_items WHERE item_id = :item_id"
         ),
         {"item_id": item.id},
     ).first()
-    return ItemStats(item=item, quantity=int(row[0]), cost_basis=Decimal(row[1]))
+    depleted_row = conn.execute(
+        text(
+            "SELECT COALESCE(SUM(quantity), 0), COALESCE(SUM(total_cost), 0) "
+            "FROM fungible_depletions WHERE item_id = :item_id"
+        ),
+        {"item_id": item.id},
+    ).first()
+    quantity = int(purchased_row[0]) - int(depleted_row[0])
+    cost_basis = Decimal(purchased_row[1]) - Decimal(depleted_row[1])
+    return ItemStats(item=item, quantity=quantity, cost_basis=cost_basis)
 
 
 @dataclass
@@ -310,13 +345,27 @@ class SerializedUnitRow:
     cost: Decimal
     purchase_ref: str
     photo_reference: Optional[str]
+    # Milestone 5 additions — default-valued so get_purchase_detail's own
+    # construction of this same dataclass (which deliberately always
+    # represents the unit as of its PURCHASE, not its current status; see
+    # module docstring) doesn't need updating.
+    status: str = "on_hand"
+    sold_date: Optional[date_type] = None
+    sold_reference: Optional[str] = None
 
 
 def get_serialized_unit_rows(conn: Connection, item_id: int) -> list[SerializedUnitRow]:
+    """Every unit ever purchased for this item — BOTH on_hand and sold —
+    so Item Detail can show full traceability and gate its "Mark as Sold"
+    action per row on each unit's own current status. This intentionally
+    differs from get_item_stats' on-hand-only rollup above; the two serve
+    different purposes (a live total vs. a full per-unit history).
+    """
     rows = conn.execute(
         text(
             """
             SELECT su.serial_id, su.acquired_cost, su.photo_reference,
+                   su.status, su.sold_date, su.sold_reference,
                    p.purchase_date, p.purchase_ref
             FROM serial_units su
             JOIN purchase_line_items pli ON pli.id = su.purchase_line_item_id
@@ -334,6 +383,9 @@ def get_serialized_unit_rows(conn: Connection, item_id: int) -> list[SerializedU
             cost=Decimal(r.acquired_cost),
             purchase_ref=r.purchase_ref,
             photo_reference=r.photo_reference,
+            status=r.status,
+            sold_date=r.sold_date,
+            sold_reference=r.sold_reference,
         )
         for r in rows
     ]
@@ -453,7 +505,7 @@ def get_purchase_detail(conn: Connection, purchase_ref: str) -> Optional[Purchas
             su_rows = conn.execute(
                 text(
                     """
-                    SELECT serial_id, acquired_cost, photo_reference
+                    SELECT serial_id, acquired_cost, photo_reference, status, sold_date, sold_reference
                     FROM serial_units WHERE purchase_line_item_id = :line_id ORDER BY id
                     """
                 ),
@@ -466,6 +518,14 @@ def get_purchase_detail(conn: Connection, purchase_ref: str) -> Optional[Purchas
                     cost=Decimal(su["acquired_cost"]),
                     purchase_ref=header["purchase_ref"],
                     photo_reference=su["photo_reference"],
+                    # Milestone 5: this purchase-history row still shows the
+                    # unit's CURRENT status (a unit purchased in this
+                    # transaction may have since been sold) — the purchase's
+                    # own cost/quantity figures above are what stay frozen
+                    # at their original posted values, not this status flag.
+                    status=su["status"],
+                    sold_date=su["sold_date"],
+                    sold_reference=su["sold_reference"],
                 )
                 for su in su_rows
             ]
@@ -512,3 +572,92 @@ def get_purchase_detail(conn: Connection, purchase_ref: str) -> Optional[Purchas
         line_count=line_count,
         lines=lines,
     )
+
+
+# --------------------------------------------------------------------- #
+# Milestone 5 (sale-side depletion) — read-only surfacing of already-
+# posted depletion events for the Sales / Depletion Log screen. Real cost
+# figures were already computed once, at depletion time, by
+# inventory/depletions.py — this module reads them verbatim, same
+# division of labor as everything else in this file (see module
+# docstring).
+# --------------------------------------------------------------------- #
+
+
+@dataclass
+class DepletionSummary:
+    id: int
+    depletion_type: str  # 'fungible' | 'serialized'
+    depletion_date: date_type
+    sku: str
+    item_name: str
+    quantity: int
+    unit_cost: Decimal
+    total_cost: Decimal
+    reference: Optional[str]
+
+
+def list_depletions(conn: Connection, sku: Optional[str] = None) -> list[DepletionSummary]:
+    """Every depletion event ever posted (fungible + serialized, merged),
+    newest first — the Sales / Depletion Log screen's read-only ledger,
+    mirroring ``list_purchases``' own shape. ``sku`` optionally narrows to
+    one item (used by Item Detail's link into this log, same pattern as
+    Item Detail linking into Purchase History by ``purchase_ref``).
+    """
+    fungible_rows = conn.execute(
+        text(
+            """
+            SELECT fd.id, fd.depletion_date, i.sku, i.name AS item_name,
+                   fd.quantity, fd.unit_cost, fd.total_cost, fd.reference
+            FROM fungible_depletions fd
+            JOIN items i ON i.id = fd.item_id
+            WHERE (:sku IS NULL OR UPPER(i.sku) = UPPER(:sku))
+            """
+        ),
+        {"sku": sku},
+    ).mappings().all()
+    results = [
+        DepletionSummary(
+            id=r["id"],
+            depletion_type="fungible",
+            depletion_date=r["depletion_date"],
+            sku=r["sku"],
+            item_name=r["item_name"],
+            quantity=r["quantity"],
+            unit_cost=Decimal(r["unit_cost"]),
+            total_cost=Decimal(r["total_cost"]),
+            reference=r["reference"],
+        )
+        for r in fungible_rows
+    ]
+
+    serial_rows = conn.execute(
+        text(
+            """
+            SELECT su.id, su.sold_date, i.sku, i.name AS item_name,
+                   su.acquired_cost, su.sold_reference
+            FROM serial_units su
+            JOIN items i ON i.id = su.item_id
+            WHERE su.status = 'sold'
+              AND (:sku IS NULL OR UPPER(i.sku) = UPPER(:sku))
+            """
+        ),
+        {"sku": sku},
+    ).mappings().all()
+    results += [
+        DepletionSummary(
+            id=r["id"],
+            depletion_type="serialized",
+            depletion_date=r["sold_date"],
+            sku=r["sku"],
+            item_name=r["item_name"],
+            quantity=1,
+            unit_cost=Decimal(r["acquired_cost"]),
+            total_cost=Decimal(r["acquired_cost"]),
+            reference=r["sold_reference"],
+        )
+        for r in serial_rows
+    ]
+
+    results.sort(key=lambda d: (d.depletion_date, d.id), reverse=True)
+    return results

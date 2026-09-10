@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Sales / Depletion Log{% endblock %}
+{% block page_title %}Sales / Depletion Log{% endblock %}
+{% block content %}
+<h1>Sales / Depletion Log</h1>
+<div class="subtitle">Read-only ledger of every stock-depletion event — a fungible line's weighted-average cost at the moment it was depleted, or a serialized unit's own acquisition cost. No sale price or revenue is tracked here; see Project-Noctrowl for that.</div>
+<div id="sales-filter-note" style="display:none;" class="subtitle"></div>
+<div id="sales-list">Loading…</div>
+<script>window.SALES_FILTER_SKU = {{ filter_sku|tojson }};</script>
+{% endblock %}
+{% block scripts %}<script src="/static/js/sales_log.js"></script>{% endblock %}

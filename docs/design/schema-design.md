@@ -10,6 +10,14 @@ Project-Noctrowl's own `docs/design/schema-design.md` (sibling project,
 referenced here purely for documentation conventions — none of its
 business content applies to this project).
 
+**Superseded 2026-09-10 (Milestone 5):** this document's original "no
+sale/depletion" framing throughout is no longer current — sale-side
+depletion is now real, additional scope, built alongside (not replacing)
+everything below. See `docs/design/milestone-5-depletion-design.md` for
+the new tables/business logic, and CLAUDE.md's "Milestone 5 decision" for
+why. The rest of this document is left as-is, as an accurate historical
+record of Milestone 2's own scope.
+
 ## Migrations
 
 **Approach chosen: plain, numbered `.sql` files, applied in order by
@@ -226,7 +234,9 @@ the same reason).
 - **`inventory/queries.py`** — read-side: category/item lookups, and
   `get_item_stats` / `get_category_stats` (on-hand quantity/cost rollups —
   fungible items sum `purchase_line_items`, serialized items sum
-  `serial_units`; acquisition-only, no depletion logic anywhere).
+  `serial_units`). ~~acquisition-only, no depletion logic anywhere~~ —
+  superseded 2026-09-10 (Milestone 5): these now net purchased against
+  depleted; see `docs/design/milestone-5-depletion-design.md`.
 - **`inventory/purchases.py`** — the orchestrator, `save_purchase()`. Full
   validate → resolve → allocate → check-balance → insert flow; see its
   module docstring for the exact ordering and for one deliberate
@@ -237,8 +247,11 @@ the same reason).
 
 ## Deliberate scope boundaries (mirrors CLAUDE.md's brief)
 
-- No sale/depletion logic — `serial_units.status` exists but is always
-  `'on_hand'`.
+- ~~No sale/depletion logic — `serial_units.status` exists but is always
+  `'on_hand'`.~~ Superseded 2026-09-10 — see the note at the top of this
+  document; `serial_units.status` now also allows `'sold'`, and a new
+  `fungible_depletions` table exists. See
+  `docs/design/milestone-5-depletion-design.md`.
 - No pre-order or consignment states.
 - No real Google Drive/OCR — invoice and photo fields are nullable
   groundwork only.

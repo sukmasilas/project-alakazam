@@ -1,9 +1,12 @@
 -- Migration 001: initial schema for Project-Alakazam, Milestone 2.
 --
--- Scope: categories, items, serial_units, purchases, purchase_line_items —
--- the core acquisition-only inventory data model described in
--- docs/design/schema-design.md. No web app, no ingestion, no sale/depletion
--- tables yet (see CLAUDE.md's Build status & decisions).
+-- Scope AT THE TIME THIS MIGRATION WAS WRITTEN: categories, items,
+-- serial_units, purchases, purchase_line_items — the core acquisition-only
+-- inventory data model described in docs/design/schema-design.md. No web
+-- app, no ingestion, no sale/depletion tables yet (see CLAUDE.md's Build
+-- status & decisions). This acquisition-only framing is historical, not
+-- current — see migration 003 (Milestone 5), which adds real sale-side
+-- depletion on top of the tables below without altering them.
 --
 -- Migration approach (see schema-design.md "Migrations" section for the
 -- full reasoning): plain, numbered, idempotent .sql files, applied in order

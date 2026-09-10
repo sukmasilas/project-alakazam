@@ -133,3 +133,19 @@ class NewItemCreateIn(BaseModel):
     category_code: str
     identity_mode: str
     sku: Optional[str] = None
+
+
+# --------------------------------------------------------------------- #
+# Milestone 5 — sale-side depletion
+# --------------------------------------------------------------------- #
+
+
+class FungibleDepletionIn(BaseModel):
+    quantity: int
+    reference: Optional[str] = None
+    depletion_date: Optional[date] = None
+
+
+class SerialDepletionIn(BaseModel):
+    reference: Optional[str] = None
+    sold_date: Optional[date] = None
