@@ -18,3 +18,16 @@ jinja2==3.1.6
 itsdangerous==2.2.0
 python-multipart==0.0.32
 httpx==0.28.1
+
+# Milestone 4 — the Noctrowl export pipeline (Google Drive upload). Same
+# package choices and version pins as Project-Noctrowl's own ingestion
+# layer (sibling project) for consistency, though Alakazam's own OAuth
+# client/token are entirely separate credentials (see .env.example and
+# scripts/authorize_google_drive.py) — this project never reuses Noctrowl's
+# Drive access. Only OAuth (user-consent) auth is implemented here — no
+# service-account fallback, since Alakazam is a fresh build with no legacy
+# service-account history to carry forward (unlike Noctrowl's).
+google-api-python-client==2.199.0
+google-auth==2.57.0
+google-auth-httplib2==0.4.2
+google-auth-oauthlib==1.4.1

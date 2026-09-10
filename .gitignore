@@ -5,3 +5,8 @@ __pycache__/
 .DS_Store
 *.egg-info/
 .pytest_cache/
+
+# Google OAuth client-secret / token files (Milestone 4 export pipeline) —
+# never commit real credentials or refresh tokens. See .env.example and
+# scripts/authorize_google_drive.py.
+secrets/
