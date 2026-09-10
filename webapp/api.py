@@ -17,9 +17,11 @@ from datetime import date as date_type
 from decimal import Decimal
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from sqlalchemy.engine import Connection
 
+from ingestion import ebay_import as ebay_import_engine
+from ingestion.ebay_csv import EbayCsvFormatError
 from inventory import depletions as depletions_engine
 from inventory import items as items_engine
 from inventory import purchases as purchases_engine
@@ -30,6 +32,7 @@ from inventory import uniqueness
 from inventory.exceptions import AlakazamError
 from webapp.dbdep import get_read_conn, get_write_conn
 from webapp.schemas import (
+    EbayRowMatchIn,
     FungibleDepletionIn,
     NewItemCreateIn,
     PurchaseIn,
@@ -284,3 +287,88 @@ def api_deplete_serial_unit(
 @router.get("/depletions")
 def api_list_depletions(sku: Optional[str] = None, conn: Connection = Depends(get_read_conn)):
     return serialize(queries.list_depletions(conn, sku=sku))
+
+
+# --------------------------------------------------------------------- #
+# Milestone 6 — eBay sales CSV import / review queue. Every endpoint here
+# calls straight into ingestion.ebay_import, which itself never
+# reimplements inventory.depletions' real engine — see that module's
+# docstring. Upload is Drive-only for every OTHER data source in this
+# project's sibling Noctrowl project, but this milestone's own brief calls
+# for a direct upload flow here (no Drive integration for Alakazam is
+# built at all yet — see CLAUDE.md's Build status).
+# --------------------------------------------------------------------- #
+
+
+def _ingestion_error_response(exc: Exception) -> HTTPException:
+    status_code = 404 if isinstance(exc, ebay_import_engine.RowNotFoundError) else 400
+    return HTTPException(
+        status_code=status_code,
+        detail={"error_type": type(exc).__name__, "message": str(exc)},
+    )
+
+
+_INGESTION_ERRORS = (
+    ebay_import_engine.RowNotFoundError,
+    ebay_import_engine.InvalidRowActionError,
+    EbayCsvFormatError,
+)
+
+
+@router.post("/ebay-import/upload", status_code=201)
+async def api_ebay_import_upload(file: UploadFile, conn: Connection = Depends(get_write_conn)):
+    raw = await file.read()
+    try:
+        # utf-8-sig strips a real eBay export's leading BOM (confirmed
+        # present in every real sample file) rather than leaving it stuck
+        # to the first header cell.
+        csv_text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error_type": "EncodingError", "message": f"Could not decode {file.filename!r} as UTF-8."},
+        ) from exc
+    try:
+        summary = ebay_import_engine.import_csv(conn, filename=file.filename or "upload.csv", csv_text=csv_text)
+    except EbayCsvFormatError as exc:
+        raise _ingestion_error_response(exc) from exc
+    return serialize(summary)
+
+
+@router.get("/ebay-import/batches")
+def api_ebay_import_batches(conn: Connection = Depends(get_read_conn)):
+    return serialize(ebay_import_engine.list_batches(conn))
+
+
+@router.get("/ebay-import/rows")
+def api_ebay_import_rows(batch_id: Optional[int] = None, conn: Connection = Depends(get_read_conn)):
+    return serialize(ebay_import_engine.list_review_rows(conn, batch_id=batch_id))
+
+
+@router.get("/ebay-import/serial-options")
+def api_ebay_import_serial_options(sku: str, conn: Connection = Depends(get_read_conn)):
+    return serialize(ebay_import_engine.get_on_hand_serials_for_sku(conn, sku))
+
+
+@router.post("/ebay-import/rows/{row_id}/match")
+def api_ebay_import_match_row(row_id: int, body: EbayRowMatchIn, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = ebay_import_engine.mark_row_matched(conn, row_id=row_id, sku=body.sku, serial_ids=body.serial_ids)
+    except _INGESTION_ERRORS as exc:
+        raise _ingestion_error_response(exc) from exc
+    return serialize(result)
+
+
+@router.post("/ebay-import/rows/{row_id}/skip")
+def api_ebay_import_skip_row(row_id: int, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = ebay_import_engine.mark_row_skipped(conn, row_id=row_id)
+    except _INGESTION_ERRORS as exc:
+        raise _ingestion_error_response(exc) from exc
+    return serialize(result)
+
+
+@router.post("/ebay-import/process")
+def api_ebay_import_process(batch_id: Optional[int] = None, conn: Connection = Depends(get_write_conn)):
+    results = ebay_import_engine.process_confirmed_rows(conn, batch_id=batch_id)
+    return serialize(results)

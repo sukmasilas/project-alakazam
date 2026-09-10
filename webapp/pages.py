@@ -42,3 +42,9 @@ def register_page_routes(app, templates: Jinja2Templates) -> None:
         return templates.TemplateResponse(
             request, "sales_log.html", {"active_nav": "sales", "filter_sku": sku}
         )
+
+    @app.get("/ebay-import")
+    async def ebay_import_page(request: Request):
+        return templates.TemplateResponse(
+            request, "ebay_import.html", {"active_nav": "ebay_import"}
+        )

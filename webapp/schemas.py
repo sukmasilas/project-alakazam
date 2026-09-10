@@ -149,3 +149,13 @@ class FungibleDepletionIn(BaseModel):
 class SerialDepletionIn(BaseModel):
     reference: Optional[str] = None
     sold_date: Optional[date] = None
+
+
+# --------------------------------------------------------------------- #
+# Milestone 6 — eBay sales CSV import / review queue
+# --------------------------------------------------------------------- #
+
+
+class EbayRowMatchIn(BaseModel):
+    sku: str
+    serial_ids: Optional[list[str]] = None

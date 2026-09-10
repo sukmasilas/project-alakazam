@@ -134,6 +134,30 @@ class AlreadyDepletedError(AlakazamError):
         super().__init__(f"Serial/Asset unit {serial_id!r} is not on hand (already sold).")
 
 
+class DuplicateEbaySaleError(AlakazamError):
+    """Raised when a depletion is posted with an ``ebay_transaction_id``
+    that already exists on another ``fungible_depletions``/``serial_units``
+    row (Milestone 6's real DB-level uniqueness backstop — see
+    migrations/004_add_ebay_sales_import.sql). In normal operation this is
+    expected to be unreachable: ``ingestion/ebay_import.py``'s own
+    partial-unique-index-backed import step already prevents the same
+    eBay Transaction ID from ever being stored as a second reviewable row,
+    and ``process_confirmed_rows()`` only ever calls the depletion engine
+    once per row. Kept as a real, distinct exception anyway (never silently
+    reported as ``InsufficientStockError``/``AlreadyDepletedError``) so a
+    genuine second layer of protection exists even if some future code path
+    ever calls the depletion engine directly with a duplicate ID, bypassing
+    the review-queue layer entirely.
+    """
+
+    def __init__(self, ebay_transaction_id: Optional[str]):
+        self.ebay_transaction_id = ebay_transaction_id
+        super().__init__(
+            f"eBay transaction {ebay_transaction_id!r} has already been posted to inventory — "
+            "refusing to deplete it a second time."
+        )
+
+
 class ItemMismatchError(AlakazamError):
     """Raised when a depletion claims a serial/asset unit belongs to a
     given SKU, but it's actually catalogued under a different item.

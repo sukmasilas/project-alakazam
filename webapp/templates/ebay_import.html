@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}eBay Sales Import{% endblock %}
+{% block page_title %}eBay Sales Import{% endblock %}
+{% block content %}
+<h1>eBay Sales Import</h1>
+<div class="subtitle">Upload a real eBay Seller Hub Transaction report (CSV). This is a review queue, not an auto-matcher — every Order row needs an explicit human confirmation before anything is depleted from inventory. Refund rows are shown for visibility only and are never auto-reversed.</div>
+
+<div class="control-box">
+  <div class="control-box-title">Upload a Transaction report</div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <input type="file" id="ei-file-input" accept=".csv">
+    <button type="button" class="btn btn-primary btn-sm" id="ei-upload-btn">Upload &amp; parse</button>
+  </div>
+  <div id="ei-upload-result" style="margin-top:10px;"></div>
+</div>
+
+<div class="control-box">
+  <div class="control-box-title">Batch</div>
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <select id="ei-batch-select" style="min-width:320px;"></select>
+    <button type="button" class="btn btn-sm" id="ei-refresh-btn">Refresh</button>
+    <button type="button" class="btn btn-primary btn-sm" id="ei-process-btn">Process confirmed rows</button>
+  </div>
+  <div id="ei-process-result" style="margin-top:10px;"></div>
+</div>
+
+<div id="ei-rows">Loading…</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/ebay_import.js"></script>{% endblock %}

@@ -26,6 +26,14 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 # explicit list (not introspection) so drop_schema() can never accidentally
 # reach a database it shouldn't and drop something unexpected.
 _ALL_OBJECTS_NEWEST_FIRST = [
+    # Migration 004 (Milestone 6 — eBay sales CSV import / review queue).
+    # DROP TABLE ... CASCADE below removes the new columns/partial unique
+    # indexes this migration adds to fungible_depletions/serial_units too
+    # — those two tables are already listed further down (migration 003),
+    # no separate entry needed for the ALTER TABLE additions themselves.
+    ("TABLE", "ebay_sales_row_depletions"),
+    ("TABLE", "ebay_sales_rows"),
+    ("TABLE", "ebay_import_batches"),
     # Migration 003 (Milestone 5 — sale-side depletion)
     ("TRIGGER", "trg_check_fungible_depletion_not_negative ON fungible_depletions"),
     ("FUNCTION", "check_fungible_depletion_not_negative()"),

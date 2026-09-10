@@ -83,6 +83,7 @@ from inventory.allocation import round_half_up
 from inventory.exceptions import (
     AlreadyDepletedError,
     DepletionConflictError,
+    DuplicateEbaySaleError,
     InsufficientStockError,
     ItemMismatchError,
     SerialUnitNotFoundError,
@@ -98,6 +99,13 @@ from inventory.queries import get_item_by_sku, get_item_stats
 # deadlock propagate as a raw 500 is exactly the bug being fixed.
 _POSTGRES_DEADLOCK_SQLSTATE = "40P01"
 
+# The Postgres SQLSTATE for a unique-constraint violation — used below to
+# distinguish Milestone 6's new ebay_transaction_id uniqueness backstop
+# (migrations/004_add_ebay_sales_import.sql) from the pre-existing
+# check-violation-based negative-stock trigger (SQLSTATE 23514), since both
+# now raise IntegrityError from the same INSERT/UPDATE statements.
+_POSTGRES_UNIQUE_VIOLATION_SQLSTATE = "23505"
+
 
 @dataclass
 class FungibleDepletionResult:
@@ -109,6 +117,7 @@ class FungibleDepletionResult:
     total_cost: int
     depletion_date: date_type
     reference: Optional[str]
+    ebay_transaction_id: Optional[str] = None
 
 
 @dataclass
@@ -120,6 +129,7 @@ class SerialDepletionResult:
     acquired_cost: Decimal
     sold_date: date_type
     reference: Optional[str]
+    ebay_transaction_id: Optional[str] = None
 
 
 def deplete_fungible(
@@ -128,6 +138,7 @@ def deplete_fungible(
     quantity: int,
     depletion_date: Optional[date_type] = None,
     reference: Optional[str] = None,
+    ebay_transaction_id: Optional[str] = None,
 ) -> FungibleDepletionResult:
     """Depletes ``quantity`` units of a fungible item's on-hand stock at
     the current moving weighted-average cost (on-hand cost basis / on-hand
@@ -135,6 +146,14 @@ def deplete_fungible(
     reference and CLAUDE.md's Milestone 5 decision: this is NOT FIFO batch
     order). Rejects (``InsufficientStockError``) if ``quantity`` exceeds
     current on-hand quantity.
+
+    ``ebay_transaction_id`` (Milestone 6 addition — optional, backward
+    compatible with every pre-existing caller): when given, stored on the
+    resulting row and enforced unique at the database level (a real
+    ``DuplicateEbaySaleError`` if it collides — see migrations/
+    004_add_ebay_sales_import.sql and ingestion/ebay_import.py, the only
+    real caller of this parameter today). ``None`` for every ordinary,
+    non-eBay-sourced depletion, which is entirely unaffected by this.
     """
     if quantity is None or not isinstance(quantity, int) or quantity <= 0:
         raise ValidationError("Depletion quantity must be a positive integer.")
@@ -172,8 +191,8 @@ def deplete_fungible(
                 text(
                     """
                     INSERT INTO fungible_depletions
-                        (item_id, quantity, unit_cost, total_cost, depletion_date, reference)
-                    VALUES (:item_id, :quantity, :unit_cost, :total_cost, :depletion_date, :reference)
+                        (item_id, quantity, unit_cost, total_cost, depletion_date, reference, ebay_transaction_id)
+                    VALUES (:item_id, :quantity, :unit_cost, :total_cost, :depletion_date, :reference, :ebay_transaction_id)
                     RETURNING id
                     """
                 ),
@@ -184,9 +203,13 @@ def deplete_fungible(
                     "total_cost": total_cost,
                     "depletion_date": depletion_date,
                     "reference": reference,
+                    "ebay_transaction_id": ebay_transaction_id,
                 },
             ).scalar_one()
     except IntegrityError as exc:
+        pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
+        if pgcode == _POSTGRES_UNIQUE_VIOLATION_SQLSTATE:
+            raise DuplicateEbaySaleError(ebay_transaction_id) from exc
         raise InsufficientStockError(sku=item.sku, requested=quantity, available=None) from exc
     except OperationalError as exc:
         pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
@@ -203,6 +226,7 @@ def deplete_fungible(
         total_cost=total_cost,
         depletion_date=depletion_date,
         reference=reference,
+        ebay_transaction_id=ebay_transaction_id,
     )
 
 
@@ -252,6 +276,7 @@ def deplete_serial_unit(
     expected_sku: Optional[str] = None,
     sold_date: Optional[date_type] = None,
     reference: Optional[str] = None,
+    ebay_transaction_id: Optional[str] = None,
 ) -> SerialDepletionResult:
     """Marks one specific serialized unit as sold. Rejects
     (``SerialUnitNotFoundError`` / ``AlreadyDepletedError`` /
@@ -264,6 +289,16 @@ def deplete_serial_unit(
     ``expected_sku``, when given, is enforced as part of the SAME atomic
     UPDATE statement below (not a separate check-then-update) — see that
     statement's WHERE clause.
+
+    ``ebay_transaction_id`` (Milestone 6 addition — optional, backward
+    compatible with every pre-existing caller): when given, stored on the
+    unit and enforced unique at the database level (``DuplicateEbaySaleError``
+    on collision — see migrations/004_add_ebay_sales_import.sql). The single
+    UPDATE below is now wrapped in a savepoint specifically because this new
+    failure mode (a unique-constraint violation) needs the same
+    connection-stays-usable-afterward guarantee ``deplete_fungible`` already
+    has for its own INSERT — an uncaught IntegrityError on a bare statement
+    (no savepoint) would otherwise abort the whole enclosing transaction.
     """
     normalized = (serial_id or "").strip()
     if not normalized:
@@ -271,26 +306,35 @@ def deplete_serial_unit(
 
     sold_date = sold_date or date_type.today()
 
-    row = conn.execute(
-        text(
-            """
-            UPDATE serial_units su
-            SET status = 'sold', sold_date = :sold_date, sold_reference = :reference
-            FROM items i
-            WHERE su.item_id = i.id
-              AND UPPER(su.serial_id) = UPPER(:serial_id)
-              AND su.status = 'on_hand'
-              AND (:expected_sku IS NULL OR UPPER(i.sku) = UPPER(:expected_sku))
-            RETURNING su.id, su.serial_id, su.item_id, su.acquired_cost, i.sku
-            """
-        ),
-        {
-            "sold_date": sold_date,
-            "reference": reference,
-            "serial_id": normalized,
-            "expected_sku": expected_sku,
-        },
-    ).mappings().first()
+    try:
+        with conn.begin_nested():
+            row = conn.execute(
+                text(
+                    """
+                    UPDATE serial_units su
+                    SET status = 'sold', sold_date = :sold_date, sold_reference = :reference,
+                        ebay_transaction_id = :ebay_transaction_id
+                    FROM items i
+                    WHERE su.item_id = i.id
+                      AND UPPER(su.serial_id) = UPPER(:serial_id)
+                      AND su.status = 'on_hand'
+                      AND (:expected_sku IS NULL OR UPPER(i.sku) = UPPER(:expected_sku))
+                    RETURNING su.id, su.serial_id, su.item_id, su.acquired_cost, i.sku
+                    """
+                ),
+                {
+                    "sold_date": sold_date,
+                    "reference": reference,
+                    "ebay_transaction_id": ebay_transaction_id,
+                    "serial_id": normalized,
+                    "expected_sku": expected_sku,
+                },
+            ).mappings().first()
+    except IntegrityError as exc:
+        pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
+        if pgcode == _POSTGRES_UNIQUE_VIOLATION_SQLSTATE:
+            raise DuplicateEbaySaleError(ebay_transaction_id) from exc
+        raise  # pragma: no cover — no other constraint is attached to this UPDATE
 
     if row is None:
         _diagnose_serial_depletion_failure(conn, normalized, expected_sku)
@@ -307,4 +351,5 @@ def deplete_serial_unit(
         acquired_cost=Decimal(row["acquired_cost"]),
         sold_date=sold_date,
         reference=reference,
+        ebay_transaction_id=ebay_transaction_id,
     )
