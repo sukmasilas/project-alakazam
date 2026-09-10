@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}Inventory{% endblock %}
+{% block content %}
+<h1>Inventory</h1>
+<div class="subtitle">Every tracked item, current stock position, and cost basis — filter by category on the left. Click a row to see its full purchase / unit history.</div>
+<div class="inventory-layout">
+  <div class="inventory-catnav" id="inventory-catnav"></div>
+  <div class="inventory-main">
+    <div class="rollup-row" id="inventory-rollups"></div>
+    <div class="filter-row">
+      <input type="text" id="inv-search" placeholder="Search SKU or item name…" style="min-width:260px;">
+      <select id="inv-identity-filter">
+        <option value="all">Identity: All</option>
+        <option value="fungible">Fungible only</option>
+        <option value="serialized">Serialized only</option>
+      </select>
+      <button class="btn btn-sm" id="add-item-toggle">+ Add New Item</button>
+    </div>
+    <div id="add-item-panel" style="display:none;"></div>
+    <table>
+      <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Identity</th><th class="num">On-Hand Qty</th><th class="num">Total Cost Basis</th></tr></thead>
+      <tbody id="inventory-tbody"><tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:24px;">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/inventory.js"></script>{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Purchase Entry{% endblock %}
+{% block page_title %}Purchase Entry{% endblock %}
+{% block content %}
+<h1>Purchase Entry</h1>
+<div class="subtitle">Enter a purchase and watch item cost + shipping reconcile live against the total paid. Saving always re-validates and re-computes on the server — nothing here is trusted client-side.</div>
+
+<div class="pe-header">
+  <div class="pe-field"><label>Date</label><input type="date" id="pe-date"></div>
+  <div class="pe-field"><label>Vendor / Description</label><input type="text" id="pe-vendor" placeholder="e.g. Toko Grosir Jaya"></div>
+  <div class="pe-field"><label>Total Amount Paid (IDR)</label><input type="number" id="pe-total-paid" min="0" step="1000" value="0"></div>
+  <div class="pe-field"><label>Currency</label><select id="pe-currency"><option>IDR</option></select></div>
+</div>
+
+<div id="pe-invoice-box"></div>
+<div id="pe-shipping-box"></div>
+<div id="pe-lumpsum-box"></div>
+
+<div id="pe-lines"></div>
+<button class="btn btn-sm" id="pe-add-line">+ Add line</button>
+
+<div class="balance-panel" id="balance-panel" style="margin-top:18px;">
+  <div class="balance-left">
+    <div class="balance-icon" id="balance-icon">✓</div>
+    <div class="balance-text">
+      <div class="headline" id="balance-headline">Balanced</div>
+      <div class="detail" id="balance-detail">Running total reconciles with Total Amount Paid.</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" id="save-purchase-btn" disabled>Save Purchase</button>
+</div>
+<div id="pe-server-error" class="assumption-note" style="display:none;border-color:var(--red-border);color:var(--red-text);"></div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/purchase_entry.js"></script>{% endblock %}

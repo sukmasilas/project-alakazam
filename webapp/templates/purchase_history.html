@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Purchase History{% endblock %}
+{% block page_title %}Purchase History{% endblock %}
+{% block content %}
+<h1>Purchase History</h1>
+<div class="subtitle">Read-only ledger of every purchase transaction. Click a row to expand its full line-level detail.</div>
+<div id="history-list">Loading…</div>
+<script>window.AUTO_OPEN_REF = {{ auto_open_ref|tojson }};</script>
+{% endblock %}
+{% block scripts %}<script src="/static/js/purchase_history.js"></script>{% endblock %}

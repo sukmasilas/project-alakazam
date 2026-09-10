@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Alakazam — {% block title %}Inventory{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/app.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">Alakazam<span>.</span><small>Inventory</small></div>
+    <a class="nav-item {% if active_nav == 'inventory' %}active{% endif %}" href="/inventory">Inventory</a>
+    <a class="nav-item {% if active_nav == 'purchase' %}active{% endif %}" href="/purchases/new">Purchase Entry</a>
+    <a class="nav-item {% if active_nav == 'history' %}active{% endif %}" href="/purchases">Purchase History</a>
+    <div class="nav-note">
+      Milestone 3 — real backend, real Postgres data.<br>
+      <form method="post" action="/logout" style="display:inline;"><button type="submit" class="link-btn" style="font-size:11px;">Log out</button></form>
+    </div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title">{% block page_title %}Inventory{% endblock %}</div>
+      <div class="currency-badge">All values shown in IDR (Rp)</div>
+    </div>
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/calc.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

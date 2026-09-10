@@ -1,0 +1,1604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Alakazam — UI/UX Mockup (Milestone 1, static, no backend)</title>
+<style>
+  :root {
+    --bg: #f5f4f9;
+    --panel: #ffffff;
+    --border: #e3e0ec;
+    --text: #211a30;
+    --text-dim: #6b6480;
+    --violet: #241b3a;
+    --violet-dark: #17111f;
+    --accent: #6d4aff;
+    --accent-dim: #efe9ff;
+    --amber-bg: #fff4e0;
+    --amber-text: #92600a;
+    --amber-border: #f0c775;
+    --green-bg: #e7f6ec;
+    --green-text: #1c7a3d;
+    --green-border: #a9dfba;
+    --red-bg: #fdecea;
+    --red-text: #b5342b;
+    --red-border: #f3b7b0;
+    --blue-bg: #e8f0fe;
+    --blue-text: #1a55b0;
+    --purple-bg: #f1e9ff;
+    --purple-text: #5b34c9;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+  }
+  .app { display: flex; height: 100vh; }
+
+  /* Sidebar */
+  .sidebar { width: 210px; background: var(--violet-dark); color: #d9d2ea; flex-shrink: 0; display: flex; flex-direction: column; padding: 18px 0; }
+  .brand { font-weight: 700; font-size: 17px; color: #fff; padding: 0 18px 18px 18px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 10px; }
+  .brand span { color: #a98bff; }
+  .brand small { display:block; font-weight:400; font-size:11px; color:#8a80a3; margin-top:3px; }
+  .nav-item { padding: 10px 18px; cursor: pointer; color: #b7aecb; font-weight: 500; }
+  .nav-item:hover { background: rgba(255,255,255,0.05); color: #fff; }
+  .nav-item.active { background: var(--violet); color: #fff; border-left: 3px solid var(--accent); }
+  .nav-note { margin-top: auto; padding: 12px 18px; font-size: 11px; color: #6d6588; border-top: 1px solid rgba(255,255,255,0.08); }
+  .nav-note a { color: #a98bff; cursor:pointer; }
+
+  /* Main */
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .topbar { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 24px; display: flex; align-items: center; gap: 16px; }
+  .topbar-title { font-weight: 700; color: var(--text); }
+  .currency-badge { margin-left: auto; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; background: var(--accent-dim); color: var(--accent); border: 1px solid #ddd0ff; }
+
+  .content { flex: 1; overflow-y: auto; padding: 22px 26px; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  h1 { font-size: 19px; margin: 0 0 4px 0; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 18px; }
+
+  .toast { position: fixed; top: 16px; right: 24px; background: var(--green-text); color: #fff; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; box-shadow: 0 4px 14px rgba(0,0,0,0.18); z-index: 999; display:none; }
+
+  /* Cards / rollups */
+  .rollup-row { display: flex; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+  .rollup-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 18px; min-width: 165px; flex: 1; }
+  .rollup-card .label { font-size: 11.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .rollup-card .value { font-size: 18px; font-weight: 700; }
+  .rollup-card .sub { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Filters */
+  .filter-row { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  select, input[type=text], input[type=number], input[type=date] {
+    font-family: inherit; font-size: 13px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text);
+  }
+  input[type=number] { width: 130px; }
+  .chip-row { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { padding: 6px 13px; border-radius: 20px; font-size: 12.5px; font-weight: 600; border: 1px solid var(--border); background:#fff; cursor:pointer; color: var(--text-dim); }
+  .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  th, td { text-align: left; padding: 10px 12px; font-size: 13px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #faf9fd; color: var(--text-dim); font-size: 11.5px; text-transform: uppercase; letter-spacing: .03em; font-weight: 700; }
+  tr:last-child td { border-bottom: none; }
+  tr.clickable:hover { background: #faf8ff; cursor: pointer; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .num-inline { font-variant-numeric: tabular-nums; color: var(--text-dim); font-size: 12px; }
+
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 700; }
+  .badge-fungible { background: var(--blue-bg); color: var(--blue-text); }
+  .badge-serialized { background: var(--purple-bg); color: var(--purple-text); }
+  .badge-green { background: var(--green-bg); color: var(--green-text); border: 1px solid var(--green-border); }
+  .badge-amber { background: var(--amber-bg); color: var(--amber-text); border: 1px solid var(--amber-border); }
+  .badge-red { background: var(--red-bg); color: var(--red-text); border: 1px solid var(--red-border); }
+
+  .cat-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 5px; }
+  .cat-TCG { background:#fdeeda; color:#96560a; }
+  .cat-Watches { background:#e6f0ff; color:#20509e; }
+  .cat-Automotive { background:#e9f7ee; color:#1c7a3d; }
+  .cat-Toys---Collectibles, .cat-Toys { background:#ffe6f0; color:#a3195b; }
+  .cat-Others { background:#eee; color:#555; }
+
+  .btn { font-family: inherit; font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 6px; border: 1px solid var(--border); background: #fff; color: var(--text); cursor: pointer; }
+  .btn:hover { background: #faf8ff; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #5c3ae0; }
+  .btn-primary:disabled { background: #cfc6e8; border-color:#cfc6e8; cursor: not-allowed; }
+  .btn-sm { padding: 5px 11px; font-size: 12px; }
+  .btn-danger-outline { color: var(--red-text); border-color: var(--red-border); background:#fff; }
+  .link-btn { background:none; border:none; color: var(--accent); font-weight:600; cursor:pointer; font-size:13px; padding:0; }
+
+  /* Item Detail */
+  .detail-header { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 18px; display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+  .detail-header .dh-title { font-size: 18px; font-weight: 800; }
+  .detail-header .dh-sku { color: var(--text-dim); font-size: 12.5px; margin-top: 2px; }
+  .detail-stat .label { font-size: 11px; color: var(--text-dim); text-transform:uppercase; letter-spacing:.03em; }
+  .detail-stat .value { font-size: 16px; font-weight: 700; }
+  .back-link { font-size: 12.5px; color: var(--accent); cursor: pointer; margin-bottom: 10px; display:inline-block; font-weight: 600; }
+
+  /* Inventory (merged) */
+  .inventory-layout { display: flex; gap: 20px; align-items: flex-start; }
+  .inventory-catnav { width: 190px; flex-shrink: 0; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .catnav-item { display: flex; justify-content: space-between; padding: 10px 14px; font-size: 13px; font-weight: 600; cursor: pointer; border-bottom: 1px solid var(--border); color: var(--text-dim); }
+  .catnav-item:last-child { border-bottom: none; }
+  .catnav-item:hover { background: #faf8ff; }
+  .catnav-item.active { background: var(--accent-dim); color: var(--accent); }
+  .catnav-count { color: var(--text-dim); font-weight: 400; }
+  .catnav-item.active .catnav-count { color: var(--accent); }
+  .inventory-main { flex: 1; min-width: 0; }
+
+  /* Combobox */
+  .combobox { position: relative; }
+  .combobox-input { width: 100%; }
+  .combobox-dropdown { position: absolute; z-index: 50; top: 100%; left: 0; right: 0; background: #fff; border: 1px solid var(--border); border-radius: 6px; margin-top: 4px; max-height: 240px; overflow-y: auto; box-shadow: 0 6px 18px rgba(0,0,0,0.12); }
+  .combo-option { padding: 8px 12px; cursor: pointer; font-size: 12.5px; display: flex; flex-direction: column; gap: 1px; }
+  .combo-option b { font-size: 12.5px; }
+  .combo-option span { color: var(--text-dim); font-size: 11.5px; }
+  .combo-option:hover { background: #faf8ff; }
+  .combo-create { color: var(--accent); font-weight: 700; border-bottom: 1px solid var(--border); }
+  .combo-empty { padding: 10px 12px; color: var(--text-dim); font-size: 12px; }
+
+  /* Purchase Entry */
+  .pe-header { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 14px; display: grid; grid-template-columns: 1fr 2fr 1.2fr .7fr; gap: 14px; }
+  .pe-field label { display: block; font-size: 11.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 5px; font-weight: 700; }
+  .pe-field input, .pe-field select { width: 100%; }
+
+  .control-box { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; margin-bottom: 14px; }
+  .control-box-title { font-weight: 700; font-size: 13.5px; margin-bottom: 10px; }
+  .control-sub-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+  .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .toggle-row-sm { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; color: var(--text-dim); margin-bottom: 8px; }
+  .assumption-note { font-size: 11.5px; color: var(--text-dim); background: #faf9fd; border: 1px dashed var(--border); border-radius: 6px; padding: 8px 12px; margin-top: 10px; }
+
+  .invoice-empty { font-size: 12.5px; color: var(--text-dim); margin-bottom: 10px; }
+  .invoice-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .invoice-attached { font-size: 13px; }
+  .ocr-fields { font-size: 12.5px; color: var(--text-dim); margin-top: 6px; }
+
+  .line-card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .line-top-row { display: flex; gap: 12px; align-items: end; margin-bottom: 12px; }
+  .lfield label { display:block; font-size: 10.5px; color: var(--text-dim); text-transform: uppercase; letter-spacing:.03em; margin-bottom:4px; font-weight:700; }
+  .lfield input, .lfield select { width: 100%; }
+  .pricing-row { padding-top: 10px; border-top: 1px dashed var(--border); margin-bottom: 10px; }
+  .price-toggle-group { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; }
+  .price-input-row { display: flex; gap: 8px; align-items: center; }
+  .price-input-row input { width: 150px; }
+  .mini-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .mtbtn { border: none; background: #fff; padding: 7px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer; color: var(--text-dim); }
+  .mtbtn.active { background: var(--accent); color: #fff; }
+  .computed-mirror { font-size: 12.5px; color: var(--text-dim); padding-bottom: 8px; }
+  .computed-mirror b { color: var(--text); }
+  .shipping-row { padding-top: 10px; border-top: 1px dashed var(--border); margin-bottom: 10px; }
+  .shipping-note { font-size: 12px; color: var(--text-dim); }
+  .line-outputs { display: flex; gap: 22px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); font-size: 12.5px; flex-wrap: wrap; }
+  .line-outputs .out b { display:block; font-size:14px; }
+  .sku-check { font-size: 11.5px; margin-top: 4px; font-weight: 700; }
+  .new-sku-box { margin-top: 10px; padding: 12px; background: #faf8ff; border: 1px dashed #d9cfff; border-radius: 6px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 10px; }
+  .new-sku-box .nsfield label { display:block; font-size:10.5px; color:var(--text-dim); text-transform:uppercase; font-weight:700; margin-bottom:4px; }
+  .new-sku-box .nsfield input, .new-sku-box .nsfield select { width: 100%; }
+
+  .serial-toggle { margin-top: 10px; font-size: 12.5px; color: var(--accent); font-weight: 700; cursor: pointer; }
+  .serial-panel { margin-top: 10px; padding: 12px; background: #faf9fd; border: 1px solid var(--border); border-radius: 6px; }
+  .serial-panel-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .serial-row-head { display: grid; grid-template-columns: 30px 1fr 1fr 1.4fr; gap: 10px; font-weight:700; color:var(--text-dim); font-size:11px; text-transform:uppercase; }
+  .serial-row { display: grid; grid-template-columns: 30px 1fr 1fr 1.4fr; gap: 10px; margin-bottom: 8px; align-items: center; }
+  .serial-row input { width: 100%; }
+  .serial-single { display: flex; gap: 20px; margin-top: 10px; align-items: end; flex-wrap: wrap; }
+  .serial-check { margin-top: 8px; font-size: 12px; font-weight: 700; }
+  .photo-field input[type=file], .photo-cell input[type=file] { font-size: 11px; max-width: 160px; }
+  .photo-cell { display: flex; flex-direction: column; gap: 4px; }
+  .unit-thumb { width: 34px; height: 34px; object-fit: cover; border-radius: 5px; border: 1px solid var(--border); vertical-align: middle; margin-right: 6px; }
+  .unit-thumb-sm { width: 22px; height: 22px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border); vertical-align: middle; margin-right: 5px; }
+  .unit-thumb-wrap { display: flex; align-items: center; margin-top: 4px; }
+  .photo-filename { font-size: 11px; color: var(--text-dim); }
+  .unit-chip { display: inline-flex; align-items: center; margin: 4px 10px 0 0; font-size: 12px; }
+
+  .balance-panel { position: sticky; bottom: 0; background: var(--panel); border: 2px solid var(--green-border); border-radius: var(--radius); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; margin-top: 6px; box-shadow: 0 -4px 18px rgba(0,0,0,0.06); }
+  .balance-panel.balanced { border-color: var(--green-border); background: var(--green-bg); }
+  .balance-panel.unbalanced { border-color: var(--red-border); background: var(--red-bg); }
+  .balance-left { display: flex; align-items: center; gap: 12px; }
+  .balance-icon { font-size: 22px; }
+  .balance-text .headline { font-weight: 800; font-size: 14.5px; }
+  .balance-text .detail { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+  .balance-panel.balanced .headline { color: var(--green-text); }
+  .balance-panel.unbalanced .headline { color: var(--red-text); }
+
+  /* Purchase history accordion */
+  .hist-row { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+  .hist-summary { display: grid; grid-template-columns: 100px 130px 1.6fr 150px 90px 110px 24px; gap: 12px; padding: 12px 16px; align-items: center; cursor: pointer; font-size: 13px; }
+  .hist-summary:hover { background: #faf8ff; }
+  .hist-detail { display: none; padding: 0 16px 16px 16px; border-top: 1px solid var(--border); }
+  .hist-row.open .hist-detail { display: block; }
+  .hist-row.open .chevron { transform: rotate(90deg); }
+  .chevron { transition: transform .15s; display:inline-block; color: var(--text-dim); }
+  .mini-table { margin-top: 10px; }
+  .mini-table th, .mini-table td { font-size: 12.5px; padding: 7px 10px; }
+  .hist-meta { display: flex; gap: 18px; font-size: 12px; color: var(--text-dim); margin-top: 10px; flex-wrap: wrap; }
+  .hist-invoice { font-size: 12.5px; margin-top: 8px; padding: 8px 10px; background: #faf9fd; border-radius: 6px; }
+  .hist-invoice-fields { color: var(--text-dim); margin-left: 8px; }
+  .hist-invoice-none { font-size: 12px; color: var(--text-dim); margin-top: 8px; font-style: italic; }
+</style>
+</head>
+<body>
+
+<div class="toast" id="toast"></div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">Alakazam<span>.</span><small>Inventory (prototype mockup)</small></div>
+    <div class="nav-item" data-page="inventory" onclick="goToPage('inventory')">Inventory</div>
+    <div class="nav-item" data-page="purchase" onclick="goToPage('purchase')">Purchase Entry</div>
+    <div class="nav-item" data-page="history" onclick="goToPage('history')">Purchase History</div>
+    <div class="nav-note">
+      Milestone 1 (revised) — static mockup, sample data only, no backend.<br>
+      <a onclick="location.reload()">⟲ Reset demo data</a>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">Inventory</div>
+      <div class="currency-badge">All values shown in IDR (Rp)</div>
+    </div>
+
+    <div class="content">
+
+      <!-- PAGE: Inventory (merged List + On-Hand + Category Browse) -->
+      <div class="page" id="page-inventory">
+        <h1>Inventory</h1>
+        <div class="subtitle">Every tracked item, current stock position, and cost basis — filter by category on the left. Click a row to see its full purchase / unit history.</div>
+        <div class="inventory-layout">
+          <div class="inventory-catnav" id="inventory-catnav"></div>
+          <div class="inventory-main">
+            <div class="rollup-row" id="inventory-rollups"></div>
+            <div class="filter-row">
+              <input type="text" id="inv-search" placeholder="Search SKU or item name…" oninput="renderInventoryPage()" style="min-width:260px;">
+              <select id="inv-identity-filter" onchange="renderInventoryPage()">
+                <option value="all">Identity: All</option>
+                <option value="fungible">Fungible only</option>
+                <option value="serialized">Serialized only</option>
+              </select>
+              <button class="btn btn-sm" onclick="toggleAddItemPanel()">+ Add New Item</button>
+            </div>
+            <div id="add-item-panel" style="display:none;"></div>
+            <table>
+              <thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Identity</th><th class="num">On-Hand Qty</th><th class="num">Total Cost Basis</th></tr></thead>
+              <tbody id="inventory-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAGE: Item Detail -->
+      <div class="page" id="page-item-detail">
+        <div class="back-link" onclick="goToPage('inventory')">← Back to Inventory</div>
+        <div class="detail-header" id="detail-header"></div>
+        <div id="detail-body"></div>
+      </div>
+
+      <!-- PAGE: Purchase Entry -->
+      <div class="page" id="page-purchase">
+        <h1>Purchase Entry</h1>
+        <div class="subtitle">Enter a purchase and watch item cost + shipping reconcile live against the total paid.</div>
+
+        <div class="pe-header">
+          <div class="pe-field"><label>Date</label><input type="date" id="pe-date"></div>
+          <div class="pe-field"><label>Vendor / Description</label><input type="text" id="pe-vendor" placeholder="e.g. Toko Grosir Jaya"></div>
+          <div class="pe-field"><label>Total Amount Paid (IDR)</label><input type="number" id="pe-total-paid" min="0" step="1000"></div>
+          <div class="pe-field"><label>Currency</label><select id="pe-currency"><option>IDR</option></select></div>
+        </div>
+
+        <div id="pe-invoice-box"></div>
+        <div id="pe-shipping-box"></div>
+        <div id="pe-lumpsum-box"></div>
+
+        <div id="pe-lines"></div>
+        <button class="btn btn-sm" onclick="addDraftLine()">+ Add line</button>
+
+        <div class="balance-panel" id="balance-panel" style="margin-top:18px;">
+          <div class="balance-left">
+            <div class="balance-icon" id="balance-icon">✓</div>
+            <div class="balance-text">
+              <div class="headline" id="balance-headline">Balanced</div>
+              <div class="detail" id="balance-detail">Running total reconciles with Total Amount Paid.</div>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="save-purchase-btn" onclick="savePurchase()">Save Purchase</button>
+        </div>
+      </div>
+
+      <!-- PAGE: Purchase History -->
+      <div class="page" id="page-history">
+        <h1>Purchase History</h1>
+        <div class="subtitle">Read-only ledger of every purchase transaction. Click a row to expand its full line-level detail.</div>
+        <div id="history-list"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================== DATA ============================== */
+
+const CATEGORIES = ["TCG","Watches","Automotive","Toys & Collectibles","Others"];
+const CATEGORY_PREFIX = { "TCG":"TCG", "Watches":"WATCH", "Automotive":"AUTO", "Toys & Collectibles":"TOY", "Others":"OTH" };
+
+let itemsMaster = [
+  { sku:"TCG-PKMN-BOOSTER-0001", name:"Pokémon TCG — Scarlet & Violet Booster Pack (loose)", category:"TCG", identity:"fungible" },
+  { sku:"TCG-CHARIZARD-1ED-0001", name:"Charizard 1st Edition — PSA 10", category:"TCG", identity:"serialized" },
+  { sku:"TCG-PIKACHU-VMAX-0001", name:"Pikachu VMAX Promo Card", category:"TCG", identity:"serialized" },
+  { sku:"TCG-YUGIOH-STARTER-0001", name:"Yu-Gi-Oh Starter Deck (loose)", category:"TCG", identity:"fungible" },
+  { sku:"TCG-MTG-COMMANDER-0001", name:"Magic: The Gathering Commander Box", category:"TCG", identity:"fungible" },
+  { sku:"TCG-CHARIZARD-VMAX-0001", name:"Charizard VMAX Rainbow Rare", category:"TCG", identity:"serialized" },
+
+  { sku:"WATCH-ROLEX-SUB-0001", name:"Rolex Submariner 116610LN", category:"Watches", identity:"serialized" },
+  { sku:"WATCH-OMEGA-SPEEDMASTER-0001", name:"Omega Speedmaster Professional", category:"Watches", identity:"serialized" },
+  { sku:"WATCH-CASIO-EDIFICE-0001", name:"Casio Edifice EQB Chronograph", category:"Watches", identity:"serialized" },
+
+  { sku:"AUTO-BRAKEPAD-TOYOTA-0001", name:"Brake Pad Set — Toyota Standard", category:"Automotive", identity:"fungible" },
+  { sku:"AUTO-ECU-HONDA-0001", name:"ECU Unit — Honda (tracked by serial)", category:"Automotive", identity:"serialized" },
+  { sku:"AUTO-OILFILTER-UNIVERSAL-0001", name:"Oil Filter — Universal Fit", category:"Automotive", identity:"fungible" },
+  { sku:"AUTO-SPARKPLUG-NGK-0001", name:"Spark Plug Set — NGK", category:"Automotive", identity:"fungible" },
+  { sku:"AUTO-TURBO-GARRETT-0001", name:"Turbocharger — Garrett (tracked by serial)", category:"Automotive", identity:"serialized" },
+
+  { sku:"TOY-HOTWHEELS-2024-0001", name:"Hot Wheels 2024 Mainline (loose units)", category:"Toys & Collectibles", identity:"fungible" },
+  { sku:"TOY-FUNKO-POP-0001", name:"Funko Pop! Marvel Series (loose)", category:"Toys & Collectibles", identity:"fungible" },
+  { sku:"TOY-DIECAST-TRUCK-0001", name:"Diecast Truck Lot (assorted)", category:"Toys & Collectibles", identity:"fungible" },
+  { sku:"TOY-LEGO-TECHNIC-0001", name:"LEGO Technic Set (sealed box)", category:"Toys & Collectibles", identity:"fungible" },
+
+  { sku:"OTH-VINTAGE-POSTER-0001", name:"Vintage Movie Poster Lot", category:"Others", identity:"fungible" },
+  { sku:"OTH-ANTIQUE-COIN-0001", name:"Antique Coin Set", category:"Others", identity:"fungible" },
+  { sku:"OTH-VINYL-RECORD-0001", name:"Vinyl Record Lot (assorted)", category:"Others", identity:"fungible" },
+];
+
+// Raw historical purchase definitions, in the new pricing/shipping model.
+// shippingMode: 'none' | 'manual' | 'pooled'. lumpSum: null or {amount, method}.
+// Each line: pricingMode 'direct' (priceEntryMode 'perUnit'|'total', priceValue) or
+// 'lumpsum' (lumpsumWeightKg / lumpsumValue, depending on the purchase's lumpSum.method).
+// shipsSeparately + manualShipping apply under 'pooled' (opt-out) or 'manual' (always).
+const rawPurchases = [
+  { ref:"PUR-2026-0071", date:"2026-06-02", vendor:"CardVault Distro — Charizard singles + booster restock",
+    shippingMode:"pooled", poolAmount:300000, poolMethod:"equal", lumpSum:null, totalAmountPaid:46480000,
+    invoice:null,
+    lines:[
+      { sku:"TCG-CHARIZARD-1ED-0001", qty:2, pricingMode:"direct", priceEntryMode:"total", priceValue:44000000,
+        shipsSeparately:true, manualShipping:500000, serials:["PSA10-CHZ-0091422","PSA10-CHZ-0091501"] },
+      { sku:"TCG-PKMN-BOOSTER-0001", qty:120, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:14000, shipsSeparately:false },
+    ]},
+  { ref:"PUR-2026-0078", date:"2026-06-20", vendor:"Loko Jaya Watch Traders — Rolex & Omega pair",
+    shippingMode:"manual", poolAmount:0, poolMethod:"equal", lumpSum:null, totalAmountPaid:278500000,
+    invoice:{ fileName:"watch-receipt-handwritten.jpg", ocrStatus:"needs_review" },
+    lines:[
+      { sku:"WATCH-ROLEX-SUB-0001", qty:2, pricingMode:"direct", priceEntryMode:"total", priceValue:210000000,
+        manualShipping:1500000, serials:["ROLEX-116610-7A2291","ROLEX-116610-7A2308"] },
+      { sku:"WATCH-OMEGA-SPEEDMASTER-0001", qty:1, pricingMode:"direct", priceEntryMode:"total", priceValue:66500000,
+        manualShipping:500000, serials:["OMEGA-SPD-311.30.42"] },
+    ]},
+  { ref:"PUR-2026-0083", date:"2026-07-14", vendor:"Toko Grosir Jaya — bulk auto parts + Hot Wheels case lot",
+    shippingMode:"pooled", poolAmount:400000, poolMethod:"weight", lumpSum:null, totalAmountPaid:11540000,
+    invoice:{ fileName:"invoice-toko-grosir-jaya.jpg", ocrStatus:"parsed", parsedFields:{ date:"2026-07-14", vendor:"Toko Grosir Jaya", amount:11540000 } },
+    lines:[
+      { sku:"AUTO-BRAKEPAD-TOYOTA-0001", qty:56, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:65000, shipsSeparately:false, shippingWeightKg:25 },
+      { sku:"TOY-HOTWHEELS-2024-0001", qty:180, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:20000, shipsSeparately:false, shippingWeightKg:15 },
+      { sku:"AUTO-ECU-HONDA-0001", qty:4, pricingMode:"direct", priceEntryMode:"total", priceValue:3600000,
+        shipsSeparately:true, manualShipping:300000, serials:["ECU-HND-VT001","ECU-HND-VT002","ECU-HND-VT003","ECU-HND-VT004"] },
+    ]},
+  { ref:"PUR-2026-0089", date:"2026-08-05", vendor:"Pasar Barang Antik — vintage poster lot",
+    shippingMode:"pooled", poolAmount:50000, poolMethod:"equal", lumpSum:null, totalAmountPaid:3650000,
+    invoice:null,
+    lines:[
+      { sku:"OTH-VINTAGE-POSTER-0001", qty:12, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:300000, shipsSeparately:false },
+    ]},
+  { ref:"PUR-2026-0095", date:"2026-08-22", vendor:"CardVault Distro — booster restock only",
+    shippingMode:"pooled", poolAmount:150000, poolMethod:"equal", lumpSum:null, totalAmountPaid:2150000,
+    invoice:null,
+    lines:[
+      { sku:"TCG-PKMN-BOOSTER-0001", qty:64, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:31250, shipsSeparately:false },
+    ]},
+  { ref:"PUR-2026-0102", date:"2026-09-02", vendor:"Toko Aksesoris Klasik — mixed lot, single bundled price (no per-item breakdown)",
+    shippingMode:"pooled", poolAmount:180000, poolMethod:"equal",
+    lumpSum:{ amount:4000000, method:"value" }, totalAmountPaid:4180000,
+    invoice:null,
+    lines:[
+      { sku:"OTH-ANTIQUE-COIN-0001", qty:10, pricingMode:"lumpsum", lumpsumValue:60, shipsSeparately:false },
+      { sku:"TOY-DIECAST-TRUCK-0001", qty:15, pricingMode:"lumpsum", lumpsumValue:40, shipsSeparately:false },
+    ]},
+];
+
+let purchases = [];      // materialized (computed) purchases — source of truth for all views
+let nextPurchaseSeq = 103;
+
+/* ============================ ALLOCATION MATH ============================ */
+
+// Splits an integer `total` across `weights` proportionally, rounding to whole
+// rupiah and assigning any leftover remainder to the largest share so the
+// result always sums EXACTLY to `total`. Falls back to an even split if every
+// weight is zero/undefined.
+function splitInteger(total, weights) {
+  const n = weights.length;
+  if (n === 0) return [];
+  total = Math.round(total);
+  const totalWeight = weights.reduce((a,b) => a + Math.max(0, b || 0), 0);
+  let raw;
+  if (totalWeight > 0) {
+    raw = weights.map(w => total * Math.max(0, w || 0) / totalWeight);
+  } else {
+    raw = weights.map(() => total / n);
+  }
+  const rounded = raw.map(v => Math.round(v));
+  let diff = total - rounded.reduce((a,b) => a + b, 0);
+  if (diff !== 0) {
+    let idx = 0, maxVal = -Infinity;
+    raw.forEach((v,i) => { if (v > maxVal) { maxVal = v; idx = i; } });
+    rounded[idx] += diff;
+  }
+  return rounded;
+}
+
+// p: { totalAmountPaid, shippingMode, poolAmount, poolMethod, lumpSum:{amount,method}|null,
+//      lines:[{qty, pricingMode, priceEntryMode, priceValue, lumpsumWeightKg, lumpsumValue,
+//              shipsSeparately, manualShipping, shippingWeightKg}] }
+// Returns { lines:[{itemCost, shippingShare, lineTotal}], runningTotal, diff, balanced }
+function computeAllocation(p) {
+  const lines = p.lines;
+
+  // --- item cost: direct entry is authoritative per line; lump-sum lines share one group pool ---
+  const itemCostByLine = new Map();
+  const lumpsumLines = [];
+  lines.forEach(l => {
+    if (l.pricingMode === "lumpsum") { lumpsumLines.push(l); return; }
+    const val = l.priceValue || 0;
+    const cost = l.priceEntryMode === "perUnit" ? Math.round(val * (l.qty || 0)) : Math.round(val);
+    itemCostByLine.set(l, cost);
+  });
+  if (lumpsumLines.length > 0) {
+    const method = p.lumpSum ? p.lumpSum.method : "equal";
+    const amount = p.lumpSum ? (p.lumpSum.amount || 0) : 0;
+    const weight = l => method === "equal" ? (l.qty || 0) : method === "weight" ? (l.lumpsumWeightKg || 0) : (l.lumpsumValue || 0);
+    const shares = splitInteger(amount, lumpsumLines.map(weight));
+    lumpsumLines.forEach((l,i) => itemCostByLine.set(l, shares[i]));
+  }
+
+  // --- shipping: independent of item pricing entirely ---
+  const shippingShareByLine = new Map();
+  if (p.shippingMode === "manual") {
+    lines.forEach(l => shippingShareByLine.set(l, l.manualShipping || 0));
+  } else if (p.shippingMode === "pooled") {
+    const separate = lines.filter(l => l.shipsSeparately);
+    const pooled = lines.filter(l => !l.shipsSeparately);
+    separate.forEach(l => shippingShareByLine.set(l, l.manualShipping || 0));
+    const method = p.poolMethod || "equal";
+    const weight = l => method === "equal" ? (l.qty || 0) : method === "weight" ? (l.shippingWeightKg || 0) : (itemCostByLine.get(l) || 0);
+    const shares = splitInteger(p.poolAmount || 0, pooled.map(weight));
+    pooled.forEach((l,i) => shippingShareByLine.set(l, shares[i]));
+  } else {
+    lines.forEach(l => shippingShareByLine.set(l, 0)); // 'none'
+  }
+
+  const resultLines = lines.map(l => {
+    const itemCost = itemCostByLine.get(l) || 0;
+    const shippingShare = shippingShareByLine.get(l) || 0;
+    return { itemCost, shippingShare, lineTotal: itemCost + shippingShare };
+  });
+  const runningTotal = resultLines.reduce((s,l) => s + l.lineTotal, 0);
+  const diff = (p.totalAmountPaid || 0) - runningTotal;
+  return { lines: resultLines, runningTotal, diff, balanced: diff === 0 };
+}
+
+function materializePurchase(rp) {
+  const alloc = computeAllocation(rp);
+  const lines = rp.lines.map((l,i) => {
+    const a = alloc.lines[i];
+    const rec = Object.assign({}, l, { itemCost: a.itemCost, shippingShare: a.shippingShare, lineTotal: a.lineTotal });
+    if (l.serials) {
+      const costs = splitInteger(a.lineTotal, l.serials.map(() => 1));
+      rec.serialUnits = l.serials.map((s,si) => ({ serial: s, cost: costs[si], photoDataUrl: null, photoFileName: null }));
+    }
+    return rec;
+  });
+  return {
+    ref: rp.ref, date: rp.date, vendor: rp.vendor, totalAmountPaid: rp.totalAmountPaid,
+    shippingMode: rp.shippingMode, poolAmount: rp.poolAmount || 0, poolMethod: rp.poolMethod,
+    lumpSum: rp.lumpSum ? Object.assign({}, rp.lumpSum) : null,
+    invoice: rp.invoice ? Object.assign({}, rp.invoice) : null,
+    lines, balanced: alloc.balanced, runningTotal: alloc.runningTotal,
+  };
+}
+
+purchases = rawPurchases.map(materializePurchase);
+
+/* ============================ SKU / SERIAL GENERATORS ============================ */
+
+// Convention: {CATEGORY_PREFIX}-{first 1-2 words of the item name, slugified}-{4-digit sequence}
+// e.g. "Charizard VMAX Box" in TCG -> TCG-CHARIZARD-VMAX-0001. Sequence is scoped to the
+// prefix+slug combination (not global to the category), so a second unrelated TCG item doesn't
+// bump the sequence on an existing name-slug family. See design doc's Open Questions.
+function slugifyName(name) {
+  const words = (name || "").trim().split(/\s+/).slice(0, 2);
+  const slug = words.join(" ").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || "ITEM";
+}
+function generateSku(category, name) {
+  const prefix = CATEGORY_PREFIX[category] || "GEN";
+  const slug = slugifyName(name);
+  const base = prefix + "-" + slug;
+  const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp("^" + escaped + "-(\\d{4})$", "i");
+  let maxSeq = 0;
+  itemsMaster.forEach(it => { const m = it.sku.match(re); if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10)); });
+  if (draftPurchase) {
+    draftPurchase.lines.forEach(l => {
+      if (l.skuMode === "new" && l.newSku && l.newSku.code) {
+        const m = l.newSku.code.match(re);
+        if (m) maxSeq = Math.max(maxSeq, parseInt(m[1], 10));
+      }
+    });
+  }
+  return base + "-" + String(maxSeq + 1).padStart(4, "0");
+}
+// Real-time SKU uniqueness check, used for both manually-typed and auto-generated SKUs,
+// wherever a SKU is entered (new-item creation on Inventory, inline new-SKU creation in
+// Purchase Entry). excludeLineId lets a line's own in-progress code not flag itself.
+function isSkuTaken(sku, excludeLineId) {
+  const norm = (sku || "").trim().toUpperCase();
+  if (!norm) return false;
+  if (itemsMaster.some(it => it.sku.toUpperCase() === norm)) return true;
+  if (draftPurchase) {
+    return draftPurchase.lines.some(l => l.id !== excludeLineId && l.skuMode === "new" && l.newSku && (l.newSku.code || "").toUpperCase() === norm);
+  }
+  return false;
+}
+// Serial convention: {SKU}-{3-digit sequence}, continuing from however many units of that
+// SKU already exist across posted purchases (so a later batch never collides with an earlier
+// one). See design doc's Open Questions.
+function generateSerialsForLine(l) {
+  const effectiveSku = l.skuMode === "new" ? (l.newSku && l.newSku.code) : l.sku;
+  if (!effectiveSku) return;
+  const existingCount = getItemStats(effectiveSku).serializedUnits.length;
+  // Also account for serials already generated/typed on sibling lines of the same SKU within
+  // this same unsaved draft — otherwise two lines of one SKU in one purchase both start
+  // counting from the posted-only total and generate identical IDs (see design doc).
+  let siblingMax = 0;
+  const escapedSku = effectiveSku.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const siblingRe = new RegExp("^" + escapedSku + "-(\\d{3})$", "i");
+  if (draftPurchase) {
+    draftPurchase.lines.forEach(other => {
+      if (other === l) return;
+      const otherSku = other.skuMode === "new" ? (other.newSku && other.newSku.code) : other.sku;
+      if (otherSku !== effectiveSku) return;
+      (other.serialUnits || []).forEach(u => {
+        const m = (u.serial || "").match(siblingRe);
+        if (m) siblingMax = Math.max(siblingMax, parseInt(m[1], 10));
+      });
+    });
+  }
+  const startAt = Math.max(existingCount, siblingMax);
+  const qty = l.qty || 1;
+  const units = (l.serialUnits && l.serialUnits.length === qty) ? l.serialUnits : defaultSerialUnits(l);
+  units.forEach((u,i) => { u.serial = effectiveSku + "-" + String(startAt + i + 1).padStart(3, "0"); });
+  l.serialUnits = units;
+}
+// Real backstop against ANY duplicate Serial/Asset ID — regardless of how it got there
+// (generation collision, manual typo, or copy/paste) — scanning posted purchases plus every
+// serialized line in the current draft. Mirrors allNewSkusUnique()'s role for SKUs: generation
+// alone (above) is a convenience, this is the actual gate that blocks Save.
+function findDuplicateSerialKeys() {
+  const counts = new Map();
+  const bump = (serial) => {
+    const key = (serial || "").trim().toUpperCase();
+    if (!key) return;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  };
+  purchases.forEach(p => p.lines.forEach(l => (l.serialUnits || []).forEach(u => bump(u.serial))));
+  if (draftPurchase) {
+    draftPurchase.lines.forEach(l => {
+      if (draftLineIdentity(l) !== "serialized") return;
+      (l.serialUnits || []).forEach(u => bump(u.serial));
+    });
+  }
+  const dupes = new Set();
+  counts.forEach((c,k) => { if (c > 1) dupes.add(k); });
+  return dupes;
+}
+function allSerialsUnique() { return findDuplicateSerialKeys().size === 0; }
+
+/* ============================== HELPERS ============================== */
+
+function fmtIDR(n) { n = Math.round(n || 0); return "Rp " + n.toLocaleString("id-ID"); }
+function fmtIDRSigned(n) { n = Math.round(n || 0); const sign = n < 0 ? "-" : "+"; return sign + "Rp " + Math.abs(n).toLocaleString("id-ID"); }
+function fmtQty(qty) { return qty.toLocaleString("id-ID") + " units"; }
+function catClass(cat) { return "cat-" + cat.replace(/[^A-Za-z]/g, "").slice(0,20); }
+function escapeAttr(s) { return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function identityBadge(identity) {
+  return identity === "serialized" ? '<span class="badge badge-serialized">Serialized</span>' : '<span class="badge badge-fungible">Fungible</span>';
+}
+function resolveIdentityBySku(sku) { const it = itemsMaster.find(i => i.sku === sku); return it ? it.identity : "fungible"; }
+function resolveItem(sku) { return itemsMaster.find(i => i.sku === sku); }
+
+function getItemStats(sku) {
+  const item = resolveItem(sku);
+  const fungibleRows = [];
+  const serializedUnits = [];
+  purchases.forEach(p => {
+    p.lines.forEach(l => {
+      if (l.sku !== sku) return;
+      if (l.serialUnits) {
+        l.serialUnits.forEach(u => serializedUnits.push({ serial: u.serial, acquiredDate: p.date, cost: u.cost, ref: p.ref, photoDataUrl: u.photoDataUrl || null, photoFileName: u.photoFileName || null }));
+      } else {
+        fungibleRows.push({ date: p.date, ref: p.ref, qty: l.qty, allocatedUnitCost: l.lineTotal / l.qty, lineTotal: l.lineTotal });
+      }
+    });
+  });
+  fungibleRows.sort((a,b) => a.date.localeCompare(b.date));
+  serializedUnits.sort((a,b) => a.acquiredDate.localeCompare(b.acquiredDate));
+  const qty = item && item.identity === "serialized" ? serializedUnits.length : fungibleRows.reduce((s,r)=>s+r.qty,0);
+  const costBasis = item && item.identity === "serialized" ? serializedUnits.reduce((s,u)=>s+u.cost,0) : fungibleRows.reduce((s,r)=>s+r.lineTotal,0);
+  return { item, qty, costBasis, fungibleRows, serializedUnits };
+}
+
+function getCategoryStats() {
+  const stats = {};
+  CATEGORIES.forEach(c => stats[c] = { count: 0, qty: 0, costBasis: 0 });
+  itemsMaster.forEach(it => {
+    const s = getItemStats(it.sku);
+    if (!stats[it.category]) stats[it.category] = { count: 0, qty: 0, costBasis: 0 };
+    stats[it.category].count += 1;
+    stats[it.category].qty += s.qty;
+    stats[it.category].costBasis += s.costBasis;
+  });
+  return stats;
+}
+
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(() => { t.style.display = "none"; }, 3200);
+}
+
+/* ============================== NAVIGATION ============================== */
+
+const PAGE_TITLES = { inventory:"Inventory", "item-detail":"Item Detail", purchase:"Purchase Entry", history:"Purchase History" };
+
+function goToPage(id) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  document.getElementById("page-" + id).classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.toggle("active", n.dataset.page === id));
+  document.getElementById("topbar-title").textContent = PAGE_TITLES[id] || "";
+  if (id === "inventory") renderInventoryPage();
+  if (id === "purchase") renderPurchaseEntryPage();
+  if (id === "history") renderHistoryPage();
+}
+
+/* ============================== INVENTORY (merged) ============================== */
+
+let inventoryCatFilter = "All";
+
+function renderInventoryCatNav() {
+  const el = document.getElementById("inventory-catnav");
+  const catStats = getCategoryStats();
+  const cats = ["All"].concat(CATEGORIES);
+  el.innerHTML = cats.map(c => {
+    const count = c === "All" ? itemsMaster.length : (catStats[c] ? catStats[c].count : 0);
+    return `<div class="catnav-item ${c===inventoryCatFilter?'active':''}" onclick="setInventoryCatFilter('${c.replace(/'/g,"\\'")}')">
+      <span>${c}</span><span class="catnav-count">${count}</span>
+    </div>`;
+  }).join("");
+}
+function setInventoryCatFilter(c) { inventoryCatFilter = c; renderInventoryPage(); }
+
+function renderInventoryPage() {
+  renderInventoryCatNav();
+  const catStats = getCategoryStats();
+  const rollupCats = inventoryCatFilter === "All" ? CATEGORIES : [inventoryCatFilter];
+  document.getElementById("inventory-rollups").innerHTML = rollupCats.map(c => `
+    <div class="rollup-card">
+      <div class="label">${c}</div>
+      <div class="value">${fmtIDR(catStats[c].costBasis)}</div>
+      <div class="sub">${catStats[c].count} SKUs &middot; ${catStats[c].qty.toLocaleString("id-ID")} units</div>
+    </div>`).join("");
+
+  const identityFilter = document.getElementById("inv-identity-filter").value;
+  const search = document.getElementById("inv-search").value.trim().toLowerCase();
+  let rows = itemsMaster.filter(it => {
+    if (inventoryCatFilter !== "All" && it.category !== inventoryCatFilter) return false;
+    if (identityFilter !== "all" && it.identity !== identityFilter) return false;
+    if (search && !(it.sku.toLowerCase().includes(search) || it.name.toLowerCase().includes(search))) return false;
+    return true;
+  });
+  const tbody = document.getElementById("inventory-tbody");
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:24px;">No items match this filter.</td></tr>`;
+    return;
+  }
+  // Sorted by cost basis descending by default (carried over from the old On-Hand Stock
+  // screen this view absorbed) — "where is the money currently tied up" first.
+  const rowsWithStats = rows.map(it => ({ it, s: getItemStats(it.sku) })).sort((a,b) => b.s.costBasis - a.s.costBasis);
+  tbody.innerHTML = rowsWithStats.map(({it, s}) => {
+    return `<tr class="clickable" onclick="openItemDetail('${it.sku}')">
+      <td><b>${it.sku}</b></td><td>${it.name}</td>
+      <td><span class="cat-tag ${catClass(it.category)}">${it.category}</span></td>
+      <td>${identityBadge(it.identity)}</td>
+      <td class="num">${fmtQty(s.qty)}</td>
+      <td class="num">${fmtIDR(s.costBasis)}</td>
+    </tr>`;
+  }).join("");
+}
+
+let addItemDraft = null;
+function toggleAddItemPanel() {
+  const panel = document.getElementById("add-item-panel");
+  if (panel.style.display === "none") {
+    addItemDraft = { name:"", category: CATEGORIES[0], identity:"fungible", code:"", skuTouched:false };
+    panel.style.display = "block";
+    renderAddItemPanel();
+  } else {
+    panel.style.display = "none";
+  }
+}
+function renderAddItemPanel() {
+  const d = addItemDraft;
+  const taken = isSkuTaken(d.code);
+  document.getElementById("add-item-panel").innerHTML = `
+    <div class="new-sku-box" style="margin-bottom:14px;">
+      <div class="nsfield"><label>Name</label><input type="text" id="ai-name" value="${escapeAttr(d.name)}" placeholder="Item name"></div>
+      <div class="nsfield"><label>Category</label><select id="ai-cat">${CATEGORIES.map(c=>`<option value="${c}" ${d.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
+      <div class="nsfield"><label>Identity Mode</label><select id="ai-identity">
+        <option value="fungible" ${d.identity==="fungible"?"selected":""}>Fungible</option>
+        <option value="serialized" ${d.identity==="serialized"?"selected":""}>Serialized</option>
+      </select></div>
+      <div class="nsfield">
+        <label>SKU Code <button type="button" class="link-btn" style="font-size:11px;" onclick="regenerateAddItemSku()">🔄 Regenerate</button></label>
+        <input type="text" id="ai-code" value="${escapeAttr(d.code)}">
+        <div class="sku-check" id="ai-code-check">${taken ? '<span style="color:var(--red-text);">✗ Already exists</span>' : (d.code ? '<span style="color:var(--green-text);">✓ Available</span>' : '')}</div>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-sm" id="ai-save-btn" onclick="saveNewItem()" ${(!d.name || !d.code || taken) ? "disabled" : ""}>Add Item</button>
+    <button class="btn btn-sm" onclick="toggleAddItemPanel()">Cancel</button>
+  `;
+  wireAddItemEvents();
+}
+function wireAddItemEvents() {
+  const d = addItemDraft;
+  document.getElementById("ai-name").oninput = (e) => {
+    d.name = e.target.value;
+    if (!d.skuTouched) d.code = generateSku(d.category, d.name);
+    refreshAddItemCheckAndButton();
+    const codeEl = document.getElementById("ai-code"); if (codeEl) codeEl.value = d.code;
+  };
+  document.getElementById("ai-cat").onchange = (e) => {
+    d.category = e.target.value;
+    if (!d.skuTouched) d.code = generateSku(d.category, d.name);
+    renderAddItemPanel();
+  };
+  document.getElementById("ai-identity").onchange = (e) => { d.identity = e.target.value; };
+  document.getElementById("ai-code").oninput = (e) => { d.skuTouched = true; d.code = e.target.value.trim().toUpperCase(); refreshAddItemCheckAndButton(); };
+}
+function refreshAddItemCheckAndButton() {
+  const d = addItemDraft;
+  const taken = isSkuTaken(d.code);
+  document.getElementById("ai-code-check").innerHTML = taken ? '<span style="color:var(--red-text);">✗ Already exists</span>' : (d.code ? '<span style="color:var(--green-text);">✓ Available</span>' : '');
+  document.getElementById("ai-save-btn").disabled = !(d.name && d.code && !taken);
+}
+function regenerateAddItemSku() {
+  addItemDraft.skuTouched = false;
+  addItemDraft.code = generateSku(addItemDraft.category, addItemDraft.name);
+  renderAddItemPanel();
+}
+function saveNewItem() {
+  const d = addItemDraft;
+  if (!d.name || !d.code || isSkuTaken(d.code)) return;
+  itemsMaster.push({ sku:d.code, name:d.name, category:d.category, identity:d.identity });
+  showToast(`Item ${d.code} added.`);
+  document.getElementById("add-item-panel").style.display = "none";
+  renderInventoryPage();
+}
+
+/* ============================== ITEM DETAIL ============================== */
+
+function openItemDetail(sku) { goToPage("item-detail"); renderItemDetail(sku); }
+
+function renderItemDetail(sku) {
+  const s = getItemStats(sku);
+  const it = s.item;
+  document.getElementById("detail-header").innerHTML = `
+    <div>
+      <div class="dh-title">${it.name}</div>
+      <div class="dh-sku">${it.sku} &middot; <span class="cat-tag ${catClass(it.category)}">${it.category}</span> &middot; ${identityBadge(it.identity)}</div>
+    </div>
+    <div class="detail-stat"><div class="label">On-Hand Qty</div><div class="value">${fmtQty(s.qty)}</div></div>
+    <div class="detail-stat"><div class="label">Total Cost Basis</div><div class="value">${fmtIDR(s.costBasis)}</div></div>
+  `;
+  const body = document.getElementById("detail-body");
+  if (it.identity === "serialized") {
+    body.innerHTML = `
+      <table>
+        <thead><tr><th>Serial / Asset ID</th><th>Acquisition Date</th><th class="num">Allocated Cost</th><th>Source Purchase</th><th>Photo</th></tr></thead>
+        <tbody>${s.serializedUnits.map(u => `
+          <tr><td><b>${u.serial}</b></td><td>${u.acquiredDate}</td><td class="num">${fmtIDR(u.cost)}</td>
+          <td><a class="link-btn" onclick="openHistoryRef('${u.ref}')">${u.ref}</a></td>
+          <td>${u.photoDataUrl ? `<img src="${u.photoDataUrl}" class="unit-thumb">` : `<span style="color:var(--text-dim);font-size:12px;">No photo</span>`}</td></tr>
+        `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px;">No units on hand.</td></tr>`}</tbody>
+      </table>`;
+  } else {
+    body.innerHTML = `
+      <table>
+        <thead><tr><th>Date</th><th>Purchase Reference</th><th class="num">Qty</th><th class="num">Allocated Unit Cost</th><th class="num">Line Total</th></tr></thead>
+        <tbody>${s.fungibleRows.map(r => `
+          <tr><td>${r.date}</td><td><a class="link-btn" onclick="openHistoryRef('${r.ref}')">${r.ref}</a></td>
+          <td class="num">${r.qty.toLocaleString("id-ID")}</td><td class="num">${fmtIDR(r.allocatedUnitCost)}</td><td class="num">${fmtIDR(r.lineTotal)}</td></tr>
+        `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px;">No purchase history yet.</td></tr>`}</tbody>
+      </table>`;
+  }
+}
+function openHistoryRef(ref) { goToPage("history"); renderHistoryPage(ref); }
+
+/* ============================== PURCHASE ENTRY ============================== */
+
+let lineIdSeq = 0;
+let draftPurchase = null;
+
+function freshDraft() {
+  lineIdSeq = 0;
+  return {
+    date: "2026-09-08",
+    vendor: "Toko Grosir Jaya — bulk TCG & toys lot",
+    totalAmountPaid: 7300000,
+    shippingMode: "pooled", poolAmount: 350000, poolMethod: "weight",
+    lumpSum: null,
+    invoice: null,
+    lines: [
+      mkLine({ skuMode:"existing", sku:"TCG-PKMN-BOOSTER-0001", qty:40, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:62500, shipsSeparately:false, shippingWeightKg:12 }),
+      mkLine({ skuMode:"existing", sku:"TOY-HOTWHEELS-2024-0001", qty:60, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:30000, shipsSeparately:false, shippingWeightKg:18 }),
+      mkLine({ skuMode:"existing", sku:"AUTO-BRAKEPAD-TOYOTA-0001", qty:20, pricingMode:"direct", priceEntryMode:"perUnit", priceValue:65000, shipsSeparately:false, shippingWeightKg:10 }),
+      mkLine({ skuMode:"new", newSku:{ code:"", name:"Seiko Presage SNK (automatic)", category:"Watches", identity:"serialized", skuTouched:false },
+               qty:3, pricingMode:"direct", priceEntryMode:"total", priceValue:1200000, shipsSeparately:true, manualShipping:150000, serialPanelOpen:true }),
+      // serialUnits intentionally left unset (mkLine defaults to []) so serialAreaHTML()'s
+      // length-mismatch guard calls defaultSerialUnits() on first render and seeds the correct
+      // even-split cost per unit, instead of rendering a false "0 allocated" red mismatch.
+    ],
+  };
+}
+function mkLine(partial) {
+  return Object.assign({
+    id: ++lineIdSeq, skuMode:"existing", sku:"", newSku:null, qty:1,
+    pricingMode:"direct", priceEntryMode:"perUnit", priceValue:0,
+    lumpsumWeightKg:0, lumpsumValue:0,
+    shipsSeparately:false, manualShipping:0, shippingWeightKg:0,
+    serialPanelOpen:false, serialUnits:[],
+  }, partial);
+}
+function draftLineIdentity(l) { return l.skuMode === "new" ? ((l.newSku && l.newSku.identity) || "fungible") : resolveIdentityBySku(l.sku); }
+
+function renderPurchaseEntryPage() {
+  if (!draftPurchase) {
+    draftPurchase = freshDraft();
+    draftPurchase.lines.forEach(l => {
+      if (l.skuMode === "new" && l.newSku && !l.newSku.code) l.newSku.code = generateSku(l.newSku.category, l.newSku.name);
+    });
+  }
+  document.getElementById("pe-date").value = draftPurchase.date;
+  document.getElementById("pe-vendor").value = draftPurchase.vendor;
+  document.getElementById("pe-total-paid").value = draftPurchase.totalAmountPaid;
+  document.getElementById("pe-date").oninput = e => { draftPurchase.date = e.target.value; };
+  document.getElementById("pe-vendor").oninput = e => { draftPurchase.vendor = e.target.value; };
+  document.getElementById("pe-total-paid").oninput = e => { draftPurchase.totalAmountPaid = Number(e.target.value)||0; updateComputedDisplays(); };
+  document.getElementById("pe-invoice-box").innerHTML = invoiceBoxHTML();
+  renderShippingBox();
+  renderLumpsumBox();
+  rebuildAllLineRows();
+  updateComputedDisplays();
+}
+
+/* ---- Invoice uploader + simulated OCR ---- */
+
+const SAMPLE_INVOICES = {
+  "invoice-toko-grosir-jaya.jpg": { ocrStatus:"parsed", parsedFields:{ date:"2026-09-08", vendor:"Toko Grosir Jaya", amount:7300000 } },
+  "kurasi-shipping-receipt.jpg": { ocrStatus:"parsed", parsedFields:{ date:"2026-09-08", vendor:"Kurasi Ekspedisi", amount:350000 } },
+  "watch-receipt-handwritten.jpg": { ocrStatus:"needs_review" },
+  "blurry-phone-photo.jpg": { ocrStatus:"needs_review" },
+};
+function simulateOcr(fileName) {
+  const known = SAMPLE_INVOICES[(fileName||"").toLowerCase()];
+  if (known) return known;
+  const lower = (fileName||"").toLowerCase();
+  if (/invoice|receipt-clear|toko|struk/.test(lower) && !/handwritten|blur|photo/.test(lower)) {
+    return { ocrStatus:"parsed", parsedFields:{ date: draftPurchase.date, vendor: draftPurchase.vendor || "(vendor read from invoice)", amount: draftPurchase.totalAmountPaid || 0 } };
+  }
+  return { ocrStatus:"needs_review" };
+}
+function invoiceBoxHTML() {
+  const inv = draftPurchase.invoice;
+  let html = `<div class="control-box"><div class="control-box-title">Invoice / Proof of Transfer</div>`;
+  if (!inv) {
+    html += `<div class="invoice-empty">No file attached yet. This would upload to Google Drive in the real system (Drive holds the file, Postgres holds the structured record) — simulated client-side only here.</div>
+    <div class="invoice-actions">
+      <label class="btn btn-sm" style="display:inline-block;">Choose file… <input type="file" id="pe-invoice-file" style="display:none;" onchange="handleInvoiceFileInput(this)"></label>
+      <span style="color:var(--text-dim);font-size:12px;">or try a sample:</span>
+      <button type="button" class="btn btn-sm" onclick="attachInvoiceFile('invoice-toko-grosir-jaya.jpg')">📄 Clear invoice scan</button>
+      <button type="button" class="btn btn-sm" onclick="attachInvoiceFile('watch-receipt-handwritten.jpg')">🧾 Handwritten receipt</button>
+    </div>`;
+  } else {
+    html += `<div class="invoice-attached"><div><b>📎 ${escapeAttr(inv.fileName)}</b> <button class="link-btn" onclick="removeInvoiceFile()" style="margin-left:10px;">Remove</button></div>`;
+    if (inv.ocrStatus === "parsed") {
+      html += `<div class="badge badge-green" style="margin-top:6px;">Parsed</div>
+      <div class="ocr-fields">Read from invoice: <b>${inv.parsedFields.date}</b> &middot; <b>${escapeAttr(inv.parsedFields.vendor)}</b> &middot; <b>${fmtIDR(inv.parsedFields.amount)}</b> — auto-filled into the header above, still editable.</div>`;
+    } else {
+      html += `<div class="badge badge-amber" style="margin-top:6px;">Needs Review</div>
+      <div class="ocr-fields">This invoice couldn't be read automatically — this proof of transfer doesn't contain enough information to auto-fill. Please fill in Date, Vendor, and Total Amount Paid manually above.</div>`;
+    }
+    html += `</div>`;
+  }
+  html += `</div>`;
+  return html;
+}
+function handleInvoiceFileInput(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+  attachInvoiceFile(file.name);
+}
+function attachInvoiceFile(fileName) {
+  const result = simulateOcr(fileName);
+  draftPurchase.invoice = Object.assign({ fileName }, result);
+  if (result.ocrStatus === "parsed" && result.parsedFields) {
+    draftPurchase.date = result.parsedFields.date || draftPurchase.date;
+    draftPurchase.vendor = result.parsedFields.vendor || draftPurchase.vendor;
+    draftPurchase.totalAmountPaid = result.parsedFields.amount || draftPurchase.totalAmountPaid;
+  }
+  renderPurchaseEntryPage();
+}
+function removeInvoiceFile() { draftPurchase.invoice = null; renderPurchaseEntryPage(); }
+
+/* ---- Shipping mode box ---- */
+
+function renderShippingBox() {
+  const p = draftPurchase;
+  let html = `<div class="control-box"><div class="control-box-title">Shipping</div><div class="chip-row">`;
+  [["none","No shipping"],["manual","Manual (per line)"],["pooled","Pooled (split automatically)"]].forEach(([mode,label]) => {
+    html += `<div class="chip ${p.shippingMode===mode?'active':''}" onclick="setShippingMode('${mode}')">${label}</div>`;
+  });
+  html += `</div>`;
+  if (p.shippingMode === "pooled") {
+    html += `<div class="control-sub-grid">
+      <div class="lfield"><label>Pooled Shipping Total (IDR)</label><input type="number" min="0" step="1000" id="pe-pool-amount" value="${p.poolAmount||0}"></div>
+      <div class="lfield"><label>Split Method</label><select id="pe-pool-method">
+        <option value="equal" ${p.poolMethod==="equal"?"selected":""}>Equally (by quantity)</option>
+        <option value="weight" ${p.poolMethod==="weight"?"selected":""}>By Weight</option>
+        <option value="value" ${p.poolMethod==="value"?"selected":""}>By Value (proportional to each line's item cost)</option>
+      </select></div>
+    </div>
+    <div class="assumption-note">Any line below can still tick "ships separately" to opt out of this pool and enter its own exact shipping amount instead.</div>`;
+  } else if (p.shippingMode === "manual") {
+    html += `<div class="assumption-note">Each line below gets its own exact shipping amount — enter Rp 0 for a line that had no shipping cost of its own.</div>`;
+  } else {
+    html += `<div class="assumption-note">No shipping cost applies to any line in this purchase.</div>`;
+  }
+  html += `</div>`;
+  document.getElementById("pe-shipping-box").innerHTML = html;
+  const amt = document.getElementById("pe-pool-amount");
+  if (amt) amt.oninput = () => { draftPurchase.poolAmount = Number(amt.value)||0; updateComputedDisplays(); };
+  const meth = document.getElementById("pe-pool-method");
+  if (meth) meth.onchange = () => { draftPurchase.poolMethod = meth.value; rebuildAllLineRows(); updateComputedDisplays(); };
+}
+function setShippingMode(mode) {
+  draftPurchase.shippingMode = mode;
+  renderShippingBox();
+  rebuildAllLineRows();
+  updateComputedDisplays();
+}
+
+/* ---- Lump-sum fallback box ---- */
+
+function renderLumpsumBox() {
+  const p = draftPurchase;
+  const active = !!p.lumpSum;
+  let html = `<div class="control-box"><div class="control-box-title">Lump-Sum Pricing Fallback <span style="font-weight:400;color:var(--text-dim);">— opt-in, only for a bundle with one combined price and no per-item breakdown</span></div>`;
+  html += `<label class="toggle-row"><input type="checkbox" id="pe-lumpsum-toggle" ${active?"checked":""}> Use a lump-sum group in this purchase</label>`;
+  if (active) {
+    html += `<div class="control-sub-grid">
+      <div class="lfield"><label>Lump Sum Amount (IDR)</label><input type="number" min="0" step="1000" id="pe-lumpsum-amount" value="${p.lumpSum.amount||0}"></div>
+      <div class="lfield"><label>Split Method</label><select id="pe-lumpsum-method">
+        <option value="equal" ${p.lumpSum.method==="equal"?"selected":""}>Equally (by quantity)</option>
+        <option value="weight" ${p.lumpSum.method==="weight"?"selected":""}>By Weight</option>
+        <option value="value" ${p.lumpSum.method==="value"?"selected":""}>By Value (estimated)</option>
+      </select></div>
+    </div>
+    <div class="assumption-note">This is a deliberate fallback, not how pricing normally works — tick "Include in lump-sum group" on each line below that this bundled price actually covers. Lines left unticked are still priced directly as normal.</div>`;
+  }
+  html += `</div>`;
+  document.getElementById("pe-lumpsum-box").innerHTML = html;
+  document.getElementById("pe-lumpsum-toggle").onchange = (e) => {
+    if (e.target.checked) { draftPurchase.lumpSum = draftPurchase.lumpSum || { amount:0, method:"equal" }; }
+    else { draftPurchase.lumpSum = null; draftPurchase.lines.forEach(l => { if (l.pricingMode==="lumpsum") l.pricingMode="direct"; }); }
+    renderLumpsumBox();
+    rebuildAllLineRows();
+    updateComputedDisplays();
+  };
+  const amt = document.getElementById("pe-lumpsum-amount");
+  if (amt) amt.oninput = () => { draftPurchase.lumpSum.amount = Number(amt.value)||0; updateComputedDisplays(); };
+  const meth = document.getElementById("pe-lumpsum-method");
+  if (meth) meth.onchange = () => { draftPurchase.lumpSum.method = meth.value; rebuildAllLineRows(); updateComputedDisplays(); };
+}
+
+/* ---- Line rows ---- */
+
+function rebuildAllLineRows() {
+  const container = document.getElementById("pe-lines");
+  container.innerHTML = draftPurchase.lines.map((l,idx) => buildLineRowHTML(l, idx)).join("");
+  draftPurchase.lines.forEach((l,idx) => wireLineRowEvents(l, idx));
+}
+
+function lumpsumMethodLabel(m) { return m === "equal" ? "Equally" : m === "weight" ? "By Weight" : m === "value" ? "By Value" : m; }
+
+function skuLabelFor(l) {
+  if (l.skuMode === "new") return (l.newSku && l.newSku.code) ? l.newSku.code + " (new)" : "New SKU — fill in below";
+  const it = resolveItem(l.sku);
+  return it ? `${it.sku} — ${it.name}` : "";
+}
+
+function buildLineRowHTML(l, idx) {
+  const p = draftPurchase;
+  const isNew = l.skuMode === "new";
+  let html = `<div class="line-card" id="line-card-${l.id}">`;
+  html += `<div class="line-top-row">
+    <div class="lfield combobox-field" style="flex:1.6;">
+      <label>Item / SKU</label>
+      <div class="combobox">
+        <input type="text" class="combobox-input" id="line-${l.id}-sku-search" value="${escapeAttr(skuLabelFor(l))}" autocomplete="off" placeholder="Type a SKU or item name…">
+        <div class="combobox-dropdown" id="line-${l.id}-sku-dropdown" style="display:none;"></div>
+      </div>
+    </div>
+    <div class="lfield" style="width:90px;"><label>Qty</label><input type="number" min="1" step="1" id="line-${l.id}-qty" value="${l.qty}"></div>
+    <div class="lfield" style="width:44px;"><label>&nbsp;</label><button class="btn btn-sm btn-danger-outline" onclick="removeDraftLine(${idx})" title="Remove line">✕</button></div>
+  </div>`;
+
+  if (isNew) html += newSkuBoxHTML(l);
+
+  html += `<div class="pricing-row">`;
+  if (p.lumpSum) {
+    html += `<label class="toggle-row-sm"><input type="checkbox" id="line-${l.id}-lumpsum-include" ${l.pricingMode==="lumpsum"?"checked":""}> Include in lump-sum group (Rp ${(p.lumpSum.amount||0).toLocaleString("id-ID")}, split ${lumpsumMethodLabel(p.lumpSum.method)})</label>`;
+  }
+  if (l.pricingMode === "lumpsum") {
+    if (p.lumpSum.method === "weight") {
+      html += `<div class="lfield" style="max-width:260px;"><label>Weight (kg, for split)</label><input type="number" min="0" step="0.1" id="line-${l.id}-lumpinput" value="${l.lumpsumWeightKg||0}"></div>`;
+    } else if (p.lumpSum.method === "value") {
+      html += `<div class="lfield" style="max-width:260px;"><label>Estimated Value (relative units, for split)</label><input type="number" min="0" step="1" id="line-${l.id}-lumpinput" value="${l.lumpsumValue||0}"></div>`;
+    } else {
+      html += `<div class="shipping-note">Split equally, weighted by quantity (${l.qty}).</div>`;
+    }
+  } else {
+    html += `<div class="price-toggle-group">
+      <div class="lfield"><label>Item Price</label>
+        <div class="price-input-row">
+          <input type="number" min="0" step="1000" id="line-${l.id}-pricevalue" value="${l.priceValue||0}">
+          <div class="mini-toggle">
+            <button type="button" class="mtbtn ${l.priceEntryMode==='perUnit'?'active':''}" onclick="setPriceEntryMode(${l.id},'perUnit')">Per unit</button>
+            <button type="button" class="mtbtn ${l.priceEntryMode==='total'?'active':''}" onclick="setPriceEntryMode(${l.id},'total')">Total for line</button>
+          </div>
+        </div>
+      </div>
+      <div class="computed-mirror" id="line-${l.id}-price-mirror"></div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="shipping-row">${shippingSubFieldsHTML(l)}</div>`;
+
+  html += `<div class="line-outputs">
+    <div class="out">Item Cost<b id="line-${l.id}-itemcost">${fmtIDR(0)}</b></div>
+    <div class="out">Shipping Share<b id="line-${l.id}-shipshare">${fmtIDR(0)}</b></div>
+    <div class="out">Line Total<b id="line-${l.id}-linetotal">${fmtIDR(0)}</b></div>
+  </div>`;
+
+  html += `<div id="line-${l.id}-serial-area">${serialAreaHTML(l)}</div>`;
+  html += `</div>`;
+  return html;
+}
+
+function shippingSubFieldsHTML(l) {
+  const p = draftPurchase;
+  if (p.shippingMode === "none") return `<div class="shipping-note">No shipping cost applies.</div>`;
+  if (p.shippingMode === "manual") {
+    return `<div class="lfield" style="max-width:220px;"><label>Shipping for this line (IDR)</label><input type="number" min="0" step="1000" id="line-${l.id}-manualship" value="${l.manualShipping||0}"></div>`;
+  }
+  let html = `<label class="toggle-row-sm"><input type="checkbox" id="line-${l.id}-ships-separately" ${l.shipsSeparately?"checked":""}> This item shipped separately (not from the pooled amount)</label>`;
+  if (l.shipsSeparately) {
+    html += `<div class="lfield" style="max-width:220px;"><label>Shipping for this line (IDR)</label><input type="number" min="0" step="1000" id="line-${l.id}-manualship" value="${l.manualShipping||0}"></div>`;
+  } else if (p.poolMethod === "weight") {
+    html += `<div class="lfield" style="max-width:220px;"><label>Weight (kg, for pooled split)</label><input type="number" min="0" step="0.1" id="line-${l.id}-shipweight" value="${l.shippingWeightKg||0}"></div>`;
+  } else if (p.poolMethod === "value") {
+    html += `<div class="shipping-note">Split proportional to this line's own Item Cost above.</div>`;
+  } else {
+    html += `<div class="shipping-note">Split equally, weighted by quantity (${l.qty}).</div>`;
+  }
+  return html;
+}
+
+function newSkuBoxHTML(l) {
+  const ns = l.newSku || { code:"", name:"", category:CATEGORIES[0], identity:"fungible", skuTouched:false };
+  const taken = isSkuTaken(ns.code, l.id);
+  return `
+  <div class="new-sku-box">
+    <div class="nsfield"><label>Name</label><input type="text" id="line-${l.id}-ns-name" value="${escapeAttr(ns.name||"")}" placeholder="Item name"></div>
+    <div class="nsfield"><label>Category</label>
+      <select id="line-${l.id}-ns-cat">${CATEGORIES.map(c=>`<option value="${c}" ${ns.category===c?"selected":""}>${c}</option>`).join("")}</select>
+    </div>
+    <div class="nsfield"><label>Identity Mode</label>
+      <select id="line-${l.id}-ns-identity">
+        <option value="fungible" ${ns.identity==="fungible"?"selected":""}>Fungible</option>
+        <option value="serialized" ${ns.identity==="serialized"?"selected":""}>Serialized</option>
+      </select>
+    </div>
+    <div class="nsfield">
+      <label>SKU Code <button type="button" class="link-btn" style="font-size:11px;" onclick="regenerateSku(${l.id})">🔄 Regenerate</button></label>
+      <input type="text" id="line-${l.id}-ns-code" value="${escapeAttr(ns.code||"")}" placeholder="Auto-generated as you type the name">
+      <div class="sku-check" id="line-${l.id}-ns-code-check">${taken ? '<span style="color:var(--red-text);">✗ This SKU already exists — choose another.</span>' : (ns.code ? '<span style="color:var(--green-text);">✓ Available</span>' : '')}</div>
+    </div>
+  </div>`;
+}
+
+function serialAreaHTML(l) {
+  const identity = draftLineIdentity(l);
+  if (identity !== "serialized") return "";
+  const qty = l.qty || 1;
+  if (qty === 1) {
+    const u = (l.serialUnits && l.serialUnits[0]) || { serial:"", cost:0 };
+    return `<div class="serial-single">
+      <div class="lfield" style="max-width:260px;"><label>Serial / Asset ID</label>
+        <div style="display:flex; gap:8px;">
+          <input type="text" id="line-${l.id}-serial-0" value="${escapeAttr(u.serial||"")}" placeholder="Case/serial number or internal tag">
+          <button type="button" class="btn btn-sm" onclick="generateSerialsForLineAndRefresh(${l.id})">⚡ Generate</button>
+        </div>
+        <div class="serial-check" id="line-${l.id}-serial-check-0"></div>
+      </div>
+      <div class="photo-field">
+        <label>Photo</label>
+        <input type="file" accept="image/*" id="line-${l.id}-photo-input-0" onchange="handleUnitPhoto(${l.id},0,this)">
+        <div class="unit-thumb-wrap" id="line-${l.id}-photo-0">${u.photoDataUrl ? `<img src="${u.photoDataUrl}" class="unit-thumb"><span class="photo-filename">${escapeAttr(u.photoFileName||"")}</span>` : `<span class="photo-filename" style="color:var(--text-dim);">No photo attached</span>`}</div>
+      </div>
+    </div>`;
+  }
+  const toggleLabel = l.serialPanelOpen ? `▾ Collapse serial assignment (${qty} units)` : `▸ Assign ${qty} serial numbers →`;
+  let panel = "";
+  if (l.serialPanelOpen) {
+    const units = (l.serialUnits && l.serialUnits.length === qty) ? l.serialUnits : defaultSerialUnits(l);
+    l.serialUnits = units;
+    panel = `<div class="serial-panel" id="line-${l.id}-serial-panel">
+      <div class="serial-panel-head">
+        <div class="serial-row-head"><div>#</div><div>Serial / Asset ID</div><div>Cost (IDR)</div><div>Photo</div></div>
+        <button type="button" class="btn btn-sm" onclick="generateSerialsForLineAndRefresh(${l.id})">⚡ Generate all</button>
+      </div>
+      ${units.map((u,i) => `
+        <div class="serial-row">
+          <div>${i+1}</div>
+          <input type="text" id="line-${l.id}-serial-${i}" value="${escapeAttr(u.serial||"")}" placeholder="Serial / asset ID">
+          <input type="number" id="line-${l.id}-serialcost-${i}" value="${u.cost||0}" step="1000">
+          <div class="photo-cell">
+            <input type="file" accept="image/*" id="line-${l.id}-photo-input-${i}" onchange="handleUnitPhoto(${l.id},${i},this)">
+            <div class="unit-thumb-wrap" id="line-${l.id}-photo-${i}">${u.photoDataUrl ? `<img src="${u.photoDataUrl}" class="unit-thumb"><span class="photo-filename">${escapeAttr(u.photoFileName||"")}</span>` : `<span class="photo-filename" style="color:var(--text-dim);">No photo</span>`}</div>
+          </div>
+        </div>`).join("")}
+      <div class="serial-check" id="line-${l.id}-serial-check"></div>
+    </div>`;
+  }
+  return `<div class="serial-toggle" onclick="toggleSerialPanel(${l.id})">${toggleLabel}</div>${panel}`;
+}
+
+function defaultSerialUnits(l) {
+  const alloc = computeAllocation(draftPurchase);
+  const idx = draftPurchase.lines.indexOf(l);
+  const lineTotal = idx >= 0 ? alloc.lines[idx].lineTotal : 0;
+  const costs = splitInteger(lineTotal, Array(l.qty).fill(1));
+  return Array.from({length:l.qty}, (_,i) => ({ serial:"", cost: costs[i], photoDataUrl:null, photoFileName:null }));
+}
+function generateSerialsForLineAndRefresh(lineId) {
+  const l = draftPurchase.lines.find(x => x.id === lineId);
+  generateSerialsForLine(l);
+  rebuildLineRow(l);
+}
+function handleUnitPhoto(lineId, unitIndex, fileInputEl) {
+  const file = fileInputEl.files && fileInputEl.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const l = draftPurchase.lines.find(x => x.id === lineId);
+    if (!l) return;
+    if (!l.serialUnits[unitIndex]) l.serialUnits[unitIndex] = { serial:"", cost:0 };
+    l.serialUnits[unitIndex].photoDataUrl = reader.result;
+    l.serialUnits[unitIndex].photoFileName = file.name;
+    const thumbEl = document.getElementById(`line-${lineId}-photo-${unitIndex}`);
+    if (thumbEl) thumbEl.innerHTML = `<img src="${reader.result}" class="unit-thumb"><span class="photo-filename">${escapeAttr(file.name)}</span>`;
+  };
+  reader.readAsDataURL(file);
+}
+function toggleSerialPanel(lineId) {
+  const l = draftPurchase.lines.find(x => x.id === lineId);
+  l.serialPanelOpen = !l.serialPanelOpen;
+  rebuildLineRow(l);
+}
+
+function rebuildLineRow(l) {
+  const idx = draftPurchase.lines.indexOf(l);
+  const card = document.getElementById("line-card-" + l.id);
+  card.outerHTML = buildLineRowHTML(l, idx);
+  wireLineRowEvents(l, idx);
+  updateComputedDisplays();
+}
+
+function setPriceEntryMode(lineId, mode) {
+  const l = draftPurchase.lines.find(x => x.id === lineId);
+  // Convert the actual value across the toggle (not just relabel it) — same rounding
+  // convention already used for the live-mirrored figure — so the line's real cost
+  // survives a per-unit <-> total switch instead of being silently reinterpreted.
+  if (l.priceEntryMode !== mode) {
+    const qty = l.qty || 1;
+    if (mode === "total" && l.priceEntryMode === "perUnit") {
+      l.priceValue = Math.round((l.priceValue || 0) * qty);
+    } else if (mode === "perUnit" && l.priceEntryMode === "total") {
+      l.priceValue = qty > 0 ? Math.round((l.priceValue || 0) / qty) : (l.priceValue || 0);
+    }
+  }
+  l.priceEntryMode = mode;
+  rebuildLineRow(l);
+}
+
+/* ---- Combobox ---- */
+
+function wireComboboxEvents(l) {
+  const input = document.getElementById(`line-${l.id}-sku-search`);
+  const dropdown = document.getElementById(`line-${l.id}-sku-dropdown`);
+  input.oninput = () => renderComboboxDropdown(l, input.value);
+  input.onfocus = () => renderComboboxDropdown(l, input.value);
+  document.addEventListener("click", function outsideClick(e) {
+    if (!document.body.contains(input)) { document.removeEventListener("click", outsideClick); return; }
+    if (!input.contains(e.target) && !dropdown.contains(e.target)) dropdown.style.display = "none";
+  });
+}
+function renderComboboxDropdown(l, query) {
+  const dropdown = document.getElementById(`line-${l.id}-sku-dropdown`);
+  if (!dropdown) return;
+  const q = (query||"").trim().toLowerCase();
+  const currentLabel = skuLabelFor(l).toLowerCase();
+  let matches = itemsMaster;
+  if (q && q !== currentLabel) matches = itemsMaster.filter(it => it.sku.toLowerCase().includes(q) || it.name.toLowerCase().includes(q));
+  matches = matches.slice(0, 8);
+  let html = `<div class="combo-option combo-create" onclick="pickComboboxNew(${l.id})">+ Create new SKU inline…</div>`;
+  html += matches.length === 0
+    ? `<div class="combo-empty">No matching items — try "+ Create new SKU" above.</div>`
+    : matches.map(it => `<div class="combo-option" onclick="pickComboboxItem(${l.id}, '${escapeAttr(it.sku)}')"><b>${it.sku}</b><span>${it.name}</span></div>`).join("");
+  dropdown.innerHTML = html;
+  dropdown.style.display = "block";
+}
+function pickComboboxItem(lineId, sku) {
+  const l = draftPurchase.lines.find(x => x.id === lineId);
+  l.skuMode = "existing"; l.sku = sku; l.newSku = null;
+  rebuildLineRow(l);
+}
+function pickComboboxNew(lineId) {
+  const l = draftPurchase.lines.find(x => x.id === lineId);
+  l.skuMode = "new"; l.sku = "";
+  l.newSku = l.newSku || { code:"", name:"", category:CATEGORIES[0], identity:"fungible", skuTouched:false };
+  rebuildLineRow(l);
+}
+
+/* ---- New-SKU box wiring ---- */
+
+function wireNewSkuBoxEvents(l) {
+  const nameEl = document.getElementById(`line-${l.id}-ns-name`);
+  const catEl = document.getElementById(`line-${l.id}-ns-cat`);
+  const idEl = document.getElementById(`line-${l.id}-ns-identity`);
+  const codeEl = document.getElementById(`line-${l.id}-ns-code`);
+  const checkEl = document.getElementById(`line-${l.id}-ns-code-check`);
+  function refreshCheck() {
+    const taken = isSkuTaken(l.newSku.code, l.id);
+    checkEl.innerHTML = taken ? '<span style="color:var(--red-text);">✗ This SKU already exists — choose another.</span>' : (l.newSku.code ? '<span style="color:var(--green-text);">✓ Available</span>' : '');
+  }
+  nameEl.oninput = () => {
+    l.newSku.name = nameEl.value;
+    if (!l.newSku.skuTouched) { l.newSku.code = generateSku(l.newSku.category, l.newSku.name); codeEl.value = l.newSku.code; }
+    refreshCheck(); updateComputedDisplays();
+  };
+  catEl.onchange = () => {
+    l.newSku.category = catEl.value;
+    if (!l.newSku.skuTouched) { l.newSku.code = generateSku(l.newSku.category, l.newSku.name); codeEl.value = l.newSku.code; }
+    refreshCheck(); updateComputedDisplays();
+  };
+  idEl.onchange = () => { l.newSku.identity = idEl.value; rebuildLineRow(l); };
+  codeEl.oninput = () => { l.newSku.skuTouched = true; l.newSku.code = codeEl.value.trim().toUpperCase(); refreshCheck(); updateComputedDisplays(); };
+}
+function regenerateSku(lineId) {
+  const l = draftPurchase.lines.find(x => x.id === lineId);
+  l.newSku.skuTouched = false;
+  l.newSku.code = generateSku(l.newSku.category, l.newSku.name);
+  rebuildLineRow(l);
+}
+
+/* ---- Line-level event wiring ---- */
+
+function wireLineRowEvents(l) {
+  wireComboboxEvents(l);
+
+  const qtyInput = document.getElementById(`line-${l.id}-qty`);
+  qtyInput.oninput = () => {
+    const newQty = Math.max(1, Number(qtyInput.value) || 1);
+    const qtyChanged = newQty !== l.qty;
+    l.qty = newQty;
+    if (qtyChanged) l.serialUnits = [];
+    if (draftLineIdentity(l) === "serialized") rebuildLineRow(l); else updateComputedDisplays();
+  };
+
+  if (l.skuMode === "new") wireNewSkuBoxEvents(l);
+
+  if (draftPurchase.lumpSum) {
+    const inc = document.getElementById(`line-${l.id}-lumpsum-include`);
+    if (inc) inc.onchange = () => { l.pricingMode = inc.checked ? "lumpsum" : "direct"; rebuildLineRow(l); };
+  }
+
+  if (l.pricingMode === "lumpsum") {
+    const li = document.getElementById(`line-${l.id}-lumpinput`);
+    if (li) li.oninput = () => {
+      if (draftPurchase.lumpSum.method === "weight") l.lumpsumWeightKg = Number(li.value)||0;
+      else if (draftPurchase.lumpSum.method === "value") l.lumpsumValue = Number(li.value)||0;
+      updateComputedDisplays();
+    };
+  } else {
+    const pv = document.getElementById(`line-${l.id}-pricevalue`);
+    if (pv) pv.oninput = () => { l.priceValue = Number(pv.value)||0; updateComputedDisplays(); };
+  }
+
+  if (draftPurchase.shippingMode === "manual") {
+    const ms = document.getElementById(`line-${l.id}-manualship`);
+    if (ms) ms.oninput = () => { l.manualShipping = Number(ms.value)||0; updateComputedDisplays(); };
+  } else if (draftPurchase.shippingMode === "pooled") {
+    const sep = document.getElementById(`line-${l.id}-ships-separately`);
+    if (sep) sep.onchange = () => { l.shipsSeparately = sep.checked; rebuildLineRow(l); };
+    const ms = document.getElementById(`line-${l.id}-manualship`);
+    if (ms) ms.oninput = () => { l.manualShipping = Number(ms.value)||0; updateComputedDisplays(); };
+    const sw = document.getElementById(`line-${l.id}-shipweight`);
+    if (sw) sw.oninput = () => { l.shippingWeightKg = Number(sw.value)||0; updateComputedDisplays(); };
+  }
+
+  wireSerialAreaEvents(l);
+}
+
+function wireSerialAreaEvents(l) {
+  const identity = draftLineIdentity(l);
+  if (identity !== "serialized") return;
+  const qty = l.qty || 1;
+  if (qty === 1) {
+    const s0 = document.getElementById(`line-${l.id}-serial-0`);
+    if (s0) s0.oninput = () => {
+      if (!l.serialUnits[0]) l.serialUnits[0] = { serial:"", cost:0 };
+      l.serialUnits[0].serial = s0.value;
+      updateComputedDisplays();
+    };
+  } else if (l.serialPanelOpen) {
+    l.serialUnits.forEach((u,i) => {
+      const sEl = document.getElementById(`line-${l.id}-serial-${i}`);
+      const cEl = document.getElementById(`line-${l.id}-serialcost-${i}`);
+      if (sEl) sEl.oninput = () => { l.serialUnits[i].serial = sEl.value; updateComputedDisplays(); };
+      if (cEl) cEl.oninput = () => { l.serialUnits[i].cost = Number(cEl.value) || 0; updateComputedDisplays(); };
+    });
+  }
+}
+
+function addDraftLine() { draftPurchase.lines.push(mkLine({})); rebuildAllLineRows(); updateComputedDisplays(); }
+function removeDraftLine(idx) { draftPurchase.lines.splice(idx,1); rebuildAllLineRows(); updateComputedDisplays(); }
+
+/* ---- Recompute + balance panel ---- */
+
+function updateComputedDisplays() {
+  const alloc = computeAllocation(draftPurchase);
+  const dupeKeysNow = findDuplicateSerialKeys();
+  draftPurchase.lines.forEach((l, idx) => {
+    const a = alloc.lines[idx];
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set(`line-${l.id}-itemcost`, fmtIDR(a.itemCost));
+    set(`line-${l.id}-shipshare`, fmtIDR(a.shippingShare));
+    set(`line-${l.id}-linetotal`, fmtIDR(a.lineTotal));
+
+    const mirror = document.getElementById(`line-${l.id}-price-mirror`);
+    if (mirror && l.pricingMode !== "lumpsum") {
+      if (l.priceEntryMode === "perUnit") mirror.innerHTML = `Total for line: <b>${fmtIDR((l.priceValue||0) * (l.qty||0))}</b>`;
+      else { const perUnit = (l.qty||0) > 0 ? (l.priceValue||0) / l.qty : 0; mirror.innerHTML = `≈ Per unit: <b>${fmtIDR(perUnit)}</b>`; }
+    }
+
+    const identity = draftLineIdentity(l);
+    if (identity === "serialized" && l.qty === 1 && l.serialUnits[0]) {
+      l.serialUnits[0].cost = a.lineTotal;
+      const check0 = document.getElementById(`line-${l.id}-serial-check-0`);
+      if (check0) {
+        const serial0 = (l.serialUnits[0].serial || "").trim();
+        const isDupe0 = serial0 && dupeKeysNow.has(serial0.toUpperCase());
+        check0.innerHTML = isDupe0 ? `<span style="color:var(--red-text);">✗ This Serial/Asset ID duplicates another unit — IDs must be unique.</span>` : "";
+      }
+    }
+    if (identity === "serialized" && l.qty > 1 && l.serialPanelOpen) {
+      const check = document.getElementById(`line-${l.id}-serial-check`);
+      if (check) {
+        const sum = l.serialUnits.reduce((s,u) => s + (u.cost||0), 0);
+        const ok = sum === a.lineTotal;
+        let msg = ok
+          ? `<span style="color:var(--green-text);">✓ ${l.serialUnits.length} units allocate ${fmtIDR(sum)} of this line's ${fmtIDR(a.lineTotal)} total</span>`
+          : `<span style="color:var(--red-text);">✗ ${l.serialUnits.length} units allocate ${fmtIDR(sum)} — line total is ${fmtIDR(a.lineTotal)} (${fmtIDRSigned(a.lineTotal - sum)})</span>`;
+        const hasDupe = l.serialUnits.some(u => (u.serial||"").trim() && dupeKeysNow.has((u.serial||"").trim().toUpperCase()));
+        if (hasDupe) msg += `<br><span style="color:var(--red-text);">✗ One or more Serial/Asset IDs on this line duplicate another unit — IDs must be unique.</span>`;
+        check.innerHTML = msg;
+      }
+    }
+  });
+
+  const panel = document.getElementById("balance-panel");
+  const icon = document.getElementById("balance-icon");
+  const headline = document.getElementById("balance-headline");
+  const detail = document.getElementById("balance-detail");
+  const saveBtn = document.getElementById("save-purchase-btn");
+
+  const serialsOk = allSerialsAssigned();
+  const serialsUniqueOk = allSerialsUnique();
+  const newSkuOk = allNewSkusValid();
+  const skusUnique = allNewSkusUnique();
+
+  if (alloc.balanced) {
+    panel.classList.remove("unbalanced"); panel.classList.add("balanced");
+    icon.textContent = "✓";
+    headline.textContent = `Balanced — ${fmtIDR(alloc.runningTotal)} reconciles exactly`;
+    detail.textContent = "Sum of every line's Item Cost + Shipping Share matches Total Amount Paid.";
+  } else {
+    panel.classList.remove("balanced"); panel.classList.add("unbalanced");
+    icon.textContent = "⚠";
+    headline.textContent = `Out of balance by ${fmtIDRSigned(alloc.diff)}`;
+    detail.textContent = `Running total ${fmtIDR(alloc.runningTotal)} vs. Total Amount Paid ${fmtIDR(draftPurchase.totalAmountPaid)}.`;
+  }
+
+  let disabledReason = "";
+  if (!alloc.balanced) disabledReason = "Item cost + shipping across all lines must equal Total Amount Paid before saving.";
+  else if (!serialsOk) disabledReason = "Assign a serial/asset ID to every unit on a Serialized line before saving.";
+  else if (!serialsUniqueOk) disabledReason = "Two or more serialized units share the same Serial/Asset ID — fix the duplicate before saving.";
+  else if (!newSkuOk) disabledReason = "Fill in SKU code, name, and category for every inline-created item before saving.";
+  else if (!skusUnique) disabledReason = "One or more new SKUs already exist — fix the duplicate before saving.";
+
+  saveBtn.disabled = !!disabledReason;
+  saveBtn.title = disabledReason;
+}
+
+function allSerialsAssigned() {
+  return draftPurchase.lines.every(l => {
+    if (draftLineIdentity(l) !== "serialized") return true;
+    if (!l.serialUnits || l.serialUnits.length !== l.qty) return false;
+    return l.serialUnits.every(u => (u.serial||"").trim().length > 0);
+  });
+}
+function allNewSkusValid() {
+  return draftPurchase.lines.every(l => l.skuMode !== "new" || (l.newSku && l.newSku.code && l.newSku.name && l.newSku.category));
+}
+function allNewSkusUnique() {
+  return draftPurchase.lines.every(l => l.skuMode !== "new" || !isSkuTaken(l.newSku && l.newSku.code, l.id));
+}
+
+/* ---- Save ---- */
+
+function savePurchase() {
+  const alloc = computeAllocation(draftPurchase);
+  if (!alloc.balanced || !allSerialsAssigned() || !allSerialsUnique() || !allNewSkusValid() || !allNewSkusUnique()) return;
+
+  draftPurchase.lines.forEach(l => {
+    if (l.skuMode === "new") {
+      itemsMaster.push({ sku: l.newSku.code, name: l.newSku.name, category: l.newSku.category, identity: l.newSku.identity });
+      l.sku = l.newSku.code;
+    }
+  });
+
+  const lines = draftPurchase.lines.map((l, idx) => {
+    const a = alloc.lines[idx];
+    const rec = {
+      sku: l.sku, qty: l.qty, pricingMode: l.pricingMode,
+      priceEntryMode: l.priceEntryMode, priceValue: l.priceValue||0,
+      lumpsumWeightKg: l.lumpsumWeightKg||0, lumpsumValue: l.lumpsumValue||0,
+      shipsSeparately: !!l.shipsSeparately, manualShipping: l.manualShipping||0, shippingWeightKg: l.shippingWeightKg||0,
+      itemCost: a.itemCost, shippingShare: a.shippingShare, lineTotal: a.lineTotal,
+    };
+    if (resolveIdentityBySku(l.sku) === "serialized") {
+      rec.serialUnits = l.serialUnits.map(u => ({ serial:u.serial, cost:u.cost, photoDataUrl:u.photoDataUrl||null, photoFileName:u.photoFileName||null }));
+    }
+    return rec;
+  });
+
+  const ref = "PUR-2026-" + String(nextPurchaseSeq++).padStart(4,"0");
+  purchases.push({
+    ref, date: draftPurchase.date, vendor: draftPurchase.vendor, totalAmountPaid: draftPurchase.totalAmountPaid,
+    shippingMode: draftPurchase.shippingMode, poolAmount: draftPurchase.poolAmount||0, poolMethod: draftPurchase.poolMethod,
+    lumpSum: draftPurchase.lumpSum ? Object.assign({}, draftPurchase.lumpSum) : null,
+    invoice: draftPurchase.invoice ? Object.assign({}, draftPurchase.invoice) : null,
+    lines, balanced: true, runningTotal: alloc.runningTotal,
+  });
+
+  showToast(`Purchase ${ref} saved — ${fmtIDR(draftPurchase.totalAmountPaid)} across ${lines.length} line(s).`);
+  draftPurchase = freshDraft();
+  goToPage("history");
+  renderHistoryPage(ref);
+}
+
+/* ============================== PURCHASE HISTORY ============================== */
+
+let openHistoryRefs = new Set();
+
+function shippingModeLabelForPurchase(p) {
+  return p.shippingMode === "none" ? "No shipping" : p.shippingMode === "manual" ? "Manual (per line)" : `Pooled — ${fmtIDR(p.poolAmount)} split ${lumpsumMethodLabel(p.poolMethod)}`;
+}
+function lineCostLabel(l, p) {
+  if (l.pricingMode === "lumpsum") return `Lump-sum (${p.lumpSum ? lumpsumMethodLabel(p.lumpSum.method) : "?"})`;
+  return l.priceEntryMode === "perUnit" ? `Direct — ${fmtIDR(l.priceValue)}/unit` : `Direct — ${fmtIDR(l.priceValue)} total`;
+}
+function lineShippingLabel(l, p) {
+  if (p.shippingMode === "none") return "—";
+  if (p.shippingMode === "manual") return `Manual: ${fmtIDR(l.manualShipping||0)}`;
+  if (l.shipsSeparately) return `Ships separately: ${fmtIDR(l.manualShipping||0)}`;
+  return `Pooled share`;
+}
+
+function renderHistoryPage(autoOpenRef) {
+  if (autoOpenRef) openHistoryRefs.add(autoOpenRef);
+  const sorted = purchases.slice().sort((a,b) => b.date.localeCompare(a.date) || b.ref.localeCompare(a.ref));
+  document.getElementById("history-list").innerHTML = sorted.map(p => {
+    const open = openHistoryRefs.has(p.ref);
+    return `
+    <div class="hist-row ${open?'open':''}" id="hist-${p.ref}">
+      <div class="hist-summary" onclick="toggleHistoryRow('${p.ref}')">
+        <div>${p.date}</div>
+        <div><b>${p.ref}</b></div>
+        <div>${p.vendor}</div>
+        <div class="num">${fmtIDR(p.totalAmountPaid)}</div>
+        <div>${p.lines.length} line(s)</div>
+        <div><span class="badge badge-green">Balanced</span></div>
+        <div class="chevron">▶</div>
+      </div>
+      <div class="hist-detail">
+        <div class="hist-meta">
+          <span>Shipping: ${shippingModeLabelForPurchase(p)}</span>
+          ${p.lumpSum ? `<span>Lump-Sum Group: ${fmtIDR(p.lumpSum.amount)} split ${lumpsumMethodLabel(p.lumpSum.method)}</span>` : ""}
+        </div>
+        ${p.invoice ? `<div class="hist-invoice">
+          <b>📎 ${escapeAttr(p.invoice.fileName)}</b>
+          ${p.invoice.ocrStatus === "parsed"
+            ? `<span class="badge badge-green">Parsed</span> <span class="hist-invoice-fields">Read: ${p.invoice.parsedFields.date} &middot; ${escapeAttr(p.invoice.parsedFields.vendor)} &middot; ${fmtIDR(p.invoice.parsedFields.amount)}</span>`
+            : `<span class="badge badge-amber">Needs Review</span> <span class="hist-invoice-fields">This invoice couldn't be read automatically — fields were entered manually.</span>`}
+        </div>` : `<div class="hist-invoice-none">No invoice / proof of transfer attached.</div>`}
+        <table class="mini-table">
+          <thead><tr><th>SKU</th><th>Qty</th><th>Item Cost</th><th>Shipping</th><th class="num">Line Total</th></tr></thead>
+          <tbody>${p.lines.map(l => `
+            <tr>
+              <td><b>${l.sku}</b></td>
+              <td class="num">${l.qty}</td>
+              <td>${lineCostLabel(l,p)}<br><span class="num-inline">${fmtIDR(l.itemCost)}</span></td>
+              <td>${lineShippingLabel(l,p)}<br><span class="num-inline">${fmtIDR(l.shippingShare)}</span></td>
+              <td class="num">${fmtIDR(l.lineTotal)}</td>
+            </tr>
+            ${l.serialUnits ? `<tr><td colspan="5" style="padding-left:26px;background:#faf9fd;">
+              <b style="font-size:11.5px;color:var(--text-dim);">Assigned units:</b><br>
+              ${l.serialUnits.map(u => `<span class="unit-chip">${u.photoDataUrl?`<img src="${u.photoDataUrl}" class="unit-thumb-sm">`:""}${u.serial} — ${fmtIDR(u.cost)}</span>`).join("")}
+            </td></tr>` : ""}
+          `).join("")}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join("");
+}
+function toggleHistoryRow(ref) {
+  if (openHistoryRefs.has(ref)) openHistoryRefs.delete(ref); else openHistoryRefs.add(ref);
+  renderHistoryPage();
+}
+
+/* ============================== INIT ============================== */
+goToPage("inventory");
+</script>
+</body>
+</html>
