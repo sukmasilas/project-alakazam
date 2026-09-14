@@ -84,6 +84,7 @@ from inventory.exceptions import (
     AlreadyDepletedError,
     DepletionConflictError,
     DuplicateEbaySaleError,
+    DuplicatePreorderFulfillmentError,
     InsufficientStockError,
     ItemMismatchError,
     SerialUnitNotFoundError,
@@ -118,6 +119,7 @@ class FungibleDepletionResult:
     depletion_date: date_type
     reference: Optional[str]
     ebay_transaction_id: Optional[str] = None
+    preorder_sale_id: Optional[int] = None
 
 
 @dataclass
@@ -139,6 +141,7 @@ def deplete_fungible(
     depletion_date: Optional[date_type] = None,
     reference: Optional[str] = None,
     ebay_transaction_id: Optional[str] = None,
+    preorder_sale_id: Optional[int] = None,
 ) -> FungibleDepletionResult:
     """Depletes ``quantity`` units of a fungible item's on-hand stock at
     the current moving weighted-average cost (on-hand cost basis / on-hand
@@ -154,6 +157,17 @@ def deplete_fungible(
     004_add_ebay_sales_import.sql and ingestion/ebay_import.py, the only
     real caller of this parameter today). ``None`` for every ordinary,
     non-eBay-sourced depletion, which is entirely unaffected by this.
+
+    ``preorder_sale_id`` (Milestone 7 addition — optional, appended last,
+    same fully-backward-compatible pattern as ``ebay_transaction_id``
+    above): when given, stored on the resulting row and enforced unique at
+    the database level (migrations/005_add_preorder_sales.sql). This is
+    the crucial part of pre-order fulfillment's correctness (see
+    ``inventory/preorders.py``): the fulfilling Purchase's real cost joins
+    the weighted-average pool BEFORE this depletion computes ``unit_cost``
+    above, since ``get_item_stats`` is read fresh, after the purchase, on
+    every call. ``None`` for every ordinary, non-pre-order depletion, which
+    is entirely unaffected by this.
     """
     if quantity is None or not isinstance(quantity, int) or quantity <= 0:
         raise ValidationError("Depletion quantity must be a positive integer.")
@@ -191,8 +205,10 @@ def deplete_fungible(
                 text(
                     """
                     INSERT INTO fungible_depletions
-                        (item_id, quantity, unit_cost, total_cost, depletion_date, reference, ebay_transaction_id)
-                    VALUES (:item_id, :quantity, :unit_cost, :total_cost, :depletion_date, :reference, :ebay_transaction_id)
+                        (item_id, quantity, unit_cost, total_cost, depletion_date, reference,
+                         ebay_transaction_id, preorder_sale_id)
+                    VALUES (:item_id, :quantity, :unit_cost, :total_cost, :depletion_date, :reference,
+                            :ebay_transaction_id, :preorder_sale_id)
                     RETURNING id
                     """
                 ),
@@ -204,11 +220,15 @@ def deplete_fungible(
                     "depletion_date": depletion_date,
                     "reference": reference,
                     "ebay_transaction_id": ebay_transaction_id,
+                    "preorder_sale_id": preorder_sale_id,
                 },
             ).scalar_one()
     except IntegrityError as exc:
         pgcode = getattr(getattr(exc, "orig", None), "pgcode", None)
         if pgcode == _POSTGRES_UNIQUE_VIOLATION_SQLSTATE:
+            constraint_name = getattr(getattr(getattr(exc, "orig", None), "diag", None), "constraint_name", None)
+            if constraint_name == "ux_fungible_depletions_preorder_sale_id":
+                raise DuplicatePreorderFulfillmentError(preorder_sale_id) from exc
             raise DuplicateEbaySaleError(ebay_transaction_id) from exc
         raise InsufficientStockError(sku=item.sku, requested=quantity, available=None) from exc
     except OperationalError as exc:
@@ -227,6 +247,7 @@ def deplete_fungible(
         depletion_date=depletion_date,
         reference=reference,
         ebay_transaction_id=ebay_transaction_id,
+        preorder_sale_id=preorder_sale_id,
     )
 
 

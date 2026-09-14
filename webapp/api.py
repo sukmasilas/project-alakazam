@@ -24,6 +24,7 @@ from ingestion import ebay_import as ebay_import_engine
 from ingestion.ebay_csv import EbayCsvFormatError
 from inventory import depletions as depletions_engine
 from inventory import items as items_engine
+from inventory import preorders as preorders_engine
 from inventory import purchases as purchases_engine
 from inventory import queries
 from inventory import serials as serials_engine
@@ -35,6 +36,8 @@ from webapp.schemas import (
     EbayRowMatchIn,
     FungibleDepletionIn,
     NewItemCreateIn,
+    PreorderFulfillIn,
+    PreorderSaleCreateIn,
     PurchaseIn,
     SerialDepletionIn,
     to_purchase_input,
@@ -118,10 +121,13 @@ def api_list_items(
 
 
 @router.get("/items/search")
-def api_search_items(q: str = "", limit: int = 8, conn: Connection = Depends(get_read_conn)):
+def api_search_items(
+    q: str = "", limit: int = 8, identity: Optional[str] = None, conn: Connection = Depends(get_read_conn)
+):
     if not q.strip():
         return []
-    return serialize(queries.search_items(conn, q, limit=limit))
+    identity_mode = identity if identity in ("fungible", "serialized") else None
+    return serialize(queries.search_items(conn, q, limit=limit, identity_mode=identity_mode))
 
 
 @router.get("/items/{sku}")
@@ -372,3 +378,57 @@ def api_ebay_import_skip_row(row_id: int, conn: Connection = Depends(get_write_c
 def api_ebay_import_process(batch_id: Optional[int] = None, conn: Connection = Depends(get_write_conn)):
     results = ebay_import_engine.process_confirmed_rows(conn, batch_id=batch_id)
     return serialize(results)
+
+
+# --------------------------------------------------------------------- #
+# Milestone 7 — pre-order/dropship sales. Every endpoint here calls
+# straight into inventory.preorders, which itself never reimplements
+# inventory.purchases.save_purchase()/inventory.depletions.deplete_fungible()
+# — same discipline as every prior milestone. The server is always
+# authoritative for every invariant here (status transitions, the
+# fungible-only rule, item-identity matching between a fulfilling purchase
+# and the pre-order sales it covers) — a client-supplied id/quantity/sku is
+# never trusted beyond what inventory.preorders actually accepts.
+# --------------------------------------------------------------------- #
+
+
+@router.get("/preorder-sales")
+def api_list_preorder_sales(
+    status: Optional[str] = None, sku: Optional[str] = None, conn: Connection = Depends(get_read_conn)
+):
+    return serialize(preorders_engine.list_preorder_sales(conn, status=status, sku=sku))
+
+
+@router.post("/preorder-sales", status_code=201)
+def api_create_preorder_sale(body: PreorderSaleCreateIn, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = preorders_engine.record_preorder_sale(
+            conn, sku=body.sku, quantity=body.quantity, sale_date=body.sale_date, reference=body.reference
+        )
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+@router.post("/preorder-sales/{preorder_sale_id}/cancel")
+def api_cancel_preorder_sale(preorder_sale_id: int, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = preorders_engine.cancel_preorder_sale(conn, preorder_sale_id)
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+@router.post("/preorder-sales/fulfill", status_code=201)
+def api_fulfill_preorder_sales(body: PreorderFulfillIn, conn: Connection = Depends(get_write_conn)):
+    purchase_input = to_purchase_input(body.purchase) if body.purchase is not None else None
+    try:
+        result = preorders_engine.fulfill_preorder_sales(
+            conn,
+            preorder_sale_ids=body.preorder_sale_ids,
+            purchase=purchase_input,
+            purchase_id=body.purchase_id,
+        )
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)

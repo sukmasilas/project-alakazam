@@ -48,3 +48,9 @@ def register_page_routes(app, templates: Jinja2Templates) -> None:
         return templates.TemplateResponse(
             request, "ebay_import.html", {"active_nav": "ebay_import"}
         )
+
+    @app.get("/preorders")
+    async def preorder_sales_page(request: Request):
+        return templates.TemplateResponse(
+            request, "preorder_sales.html", {"active_nav": "preorders"}
+        )

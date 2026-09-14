@@ -51,6 +51,7 @@ from inventory.allocation import (
 from inventory.exceptions import (
     DuplicateSerialError,
     DuplicateSkuError,
+    PurchaseRefConflictError,
     ReconciliationError,
     ValidationError,
 )
@@ -207,6 +208,19 @@ def _resolve_new_item_sku(
 
 
 def _generate_purchase_ref(conn: Connection, purchase_date: date) -> str:
+    """Computes the next sequential ``PUR-{year}-####`` reference from a
+    plain, UNLOCKED ``SELECT`` + Python ``max()``. This is deliberately NOT
+    concurrency-safe on its own — two overlapping, not-yet-committed
+    transactions can both read the same max and compute the same "next"
+    ref. That race is real (QA found it via genuine, barrier-synchronized
+    concurrency: two callers of ``save_purchase()`` at the exact same
+    instant, 25/25 trials one side got an uncaught unique-violation) but is
+    handled entirely by this function's ONE caller (``save_purchase()``,
+    below), via a bounded retry loop around both this call and the actual
+    INSERT — never here, since a caller-side retry needs to regenerate a
+    FRESH ref each attempt (re-reading whatever the winning side just
+    committed), not just retry the same doomed value.
+    """
     year = purchase_date.year
     rows = conn.execute(
         text("SELECT purchase_ref FROM purchases WHERE purchase_ref LIKE :pattern"),
@@ -219,6 +233,34 @@ def _generate_purchase_ref(conn: Connection, purchase_date: date) -> str:
         if suffix.isdigit():
             max_seq = max(max_seq, int(suffix))
     return f"{prefix}{max_seq + 1:04d}"
+
+
+def _is_purchase_ref_unique_violation(exc: IntegrityError) -> bool:
+    """True only for the specific ``purchases_purchase_ref_key`` unique-
+    index violation (Postgres's default constraint name for
+    ``purchase_ref TEXT NOT NULL UNIQUE`` — migrations/001_initial_schema.sql)
+    — never a blanket "any IntegrityError means a ref collision", which
+    would silently mask a real, different data-integrity bug as a harmless,
+    retryable race. Same pattern as
+    ingestion/ebay_import.py::_is_order_txn_id_unique_violation.
+    """
+    orig = getattr(exc, "orig", None)
+    pgcode = getattr(orig, "pgcode", None)
+    if pgcode != "23505":
+        return False
+    diag = getattr(orig, "diag", None)
+    constraint_name = getattr(diag, "constraint_name", None)
+    return constraint_name == "purchases_purchase_ref_key"
+
+
+# Bounded — a real safety net, not an infinite loop. Under any REALISTIC
+# concurrency this project expects (a handful of staff, not a high-volume
+# service), losing this race more than a couple of times in a row against
+# the SAME purchase save is vanishingly unlikely; see
+# PurchaseRefConflictError for what happens if this bound is ever actually
+# exhausted (a clean, distinct, explicitly-retryable error — never a raw,
+# uncaught IntegrityError/500).
+_MAX_PURCHASE_REF_ATTEMPTS = 5
 
 
 def save_purchase(conn: Connection, purchase: PurchaseInput) -> SavedPurchase:
@@ -402,43 +444,84 @@ def save_purchase(conn: Connection, purchase: PurchaseInput) -> SavedPurchase:
             raise DuplicateSerialError(serial)
 
     # --- Insert the purchase header. ---
-    purchase_ref = _generate_purchase_ref(conn, purchase.purchase_date)
-    purchase_id = conn.execute(
-        text(
-            """
-            INSERT INTO purchases (
-                purchase_ref, purchase_date, vendor_description, total_amount_paid,
-                currency, fx_rate_to_idr, shipping_mode, pooled_shipping_total,
-                pooled_shipping_method, lump_sum_active, lump_sum_total, lump_sum_method,
-                invoice_document_ref, invoice_ocr_status, invoice_parsed_fields
-            ) VALUES (
-                :purchase_ref, :purchase_date, :vendor_description, :total_amount_paid,
-                :currency, :fx_rate_to_idr, :shipping_mode, :pooled_shipping_total,
-                :pooled_shipping_method, :lump_sum_active, :lump_sum_total, :lump_sum_method,
-                :invoice_document_ref, :invoice_ocr_status, CAST(:invoice_parsed_fields AS JSONB)
-            ) RETURNING id
-            """
-        ),
-        {
-            "purchase_ref": purchase_ref,
-            "purchase_date": purchase.purchase_date,
-            "vendor_description": purchase.vendor_description,
-            "total_amount_paid": allocation.total_amount_paid,
-            "currency": purchase.currency,
-            "fx_rate_to_idr": purchase.fx_rate_to_idr,
-            "shipping_mode": purchase.shipping_mode,
-            "pooled_shipping_total": purchase.pooled_shipping_total,
-            "pooled_shipping_method": purchase.pooled_shipping_method,
-            "lump_sum_active": purchase.lump_sum_active,
-            "lump_sum_total": purchase.lump_sum_total,
-            "lump_sum_method": purchase.lump_sum_method,
-            "invoice_document_ref": purchase.invoice_document_ref,
-            "invoice_ocr_status": purchase.invoice_ocr_status,
-            "invoice_parsed_fields": (
-                None if purchase.invoice_parsed_fields is None else json.dumps(purchase.invoice_parsed_fields)
-            ),
-        },
-    ).scalar_one()
+    #
+    # QA-found bug (Milestone 7, 2026-09-14), pre-existing since Milestone
+    # 2 — not a pre-order-specific issue, just newly EXPOSED by Milestone
+    # 7 being the first flow where two genuinely independent
+    # save_purchase() calls plausibly land at the exact same real moment
+    # (two staff fulfilling different pre-orders around the same time).
+    # QA's own genuinely-simultaneous (threading.Barrier) repro: two
+    # unrelated save_purchase() calls, 15/15 trials, one side got an
+    # UNCAUGHT psycopg2 UniqueViolation on purchases_purchase_ref_key —
+    # _generate_purchase_ref()'s plain SELECT + Python max() (see that
+    # function's own docstring) has no locking, so two overlapping
+    # transactions can compute the same "next" ref before either commits.
+    # The underlying data was never actually wrong in any trial (the real
+    # unique constraint did its job — exactly one winner, never a
+    # duplicate persisted) — this was purely an uncaught-crash/UX bug, not
+    # data corruption.
+    #
+    # Fixed the same way every other unique-index backstop in this
+    # codebase is handled (SKU, serial, eBay transaction ID, pre-order sale
+    # ID): a savepoint-protected attempt, with the specific IntegrityError
+    # caught and translated cleanly — but here, since the "collision" isn't
+    # a real semantic conflict on user input (unlike a duplicate SKU the
+    # user should actually be told about), it's legitimately RETRYABLE: a
+    # bounded loop regenerates a FRESH ref each attempt (re-reading
+    # whatever the winning side just committed) and retries the insert,
+    # rather than surfacing the very first collision as a hard failure.
+    # PurchaseRefConflictError only fires if every attempt is exhausted —
+    # expected to be effectively unreachable at this project's real scale.
+    purchase_ref: Optional[str] = None
+    purchase_id: Optional[int] = None
+    for attempt in range(1, _MAX_PURCHASE_REF_ATTEMPTS + 1):
+        purchase_ref = _generate_purchase_ref(conn, purchase.purchase_date)
+        try:
+            with conn.begin_nested():
+                purchase_id = conn.execute(
+                    text(
+                        """
+                        INSERT INTO purchases (
+                            purchase_ref, purchase_date, vendor_description, total_amount_paid,
+                            currency, fx_rate_to_idr, shipping_mode, pooled_shipping_total,
+                            pooled_shipping_method, lump_sum_active, lump_sum_total, lump_sum_method,
+                            invoice_document_ref, invoice_ocr_status, invoice_parsed_fields
+                        ) VALUES (
+                            :purchase_ref, :purchase_date, :vendor_description, :total_amount_paid,
+                            :currency, :fx_rate_to_idr, :shipping_mode, :pooled_shipping_total,
+                            :pooled_shipping_method, :lump_sum_active, :lump_sum_total, :lump_sum_method,
+                            :invoice_document_ref, :invoice_ocr_status, CAST(:invoice_parsed_fields AS JSONB)
+                        ) RETURNING id
+                        """
+                    ),
+                    {
+                        "purchase_ref": purchase_ref,
+                        "purchase_date": purchase.purchase_date,
+                        "vendor_description": purchase.vendor_description,
+                        "total_amount_paid": allocation.total_amount_paid,
+                        "currency": purchase.currency,
+                        "fx_rate_to_idr": purchase.fx_rate_to_idr,
+                        "shipping_mode": purchase.shipping_mode,
+                        "pooled_shipping_total": purchase.pooled_shipping_total,
+                        "pooled_shipping_method": purchase.pooled_shipping_method,
+                        "lump_sum_active": purchase.lump_sum_active,
+                        "lump_sum_total": purchase.lump_sum_total,
+                        "lump_sum_method": purchase.lump_sum_method,
+                        "invoice_document_ref": purchase.invoice_document_ref,
+                        "invoice_ocr_status": purchase.invoice_ocr_status,
+                        "invoice_parsed_fields": (
+                            None if purchase.invoice_parsed_fields is None else json.dumps(purchase.invoice_parsed_fields)
+                        ),
+                    },
+                ).scalar_one()
+            break
+        except IntegrityError as exc:
+            if not _is_purchase_ref_unique_violation(exc):
+                raise  # some other, real, unexpected integrity error — never mask it as a ref conflict
+            if attempt < _MAX_PURCHASE_REF_ATTEMPTS:
+                continue
+            raise PurchaseRefConflictError(attempt) from exc
+    assert purchase_id is not None  # loop always either breaks with a value or raises
 
     saved_lines: list[SavedLine] = []
     for i, (line, plan) in enumerate(zip(purchase.lines, line_plans)):

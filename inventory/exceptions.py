@@ -13,6 +13,29 @@ class AlakazamError(Exception):
     """Base class for every business-logic error in this package."""
 
 
+class PurchaseRefConflictError(AlakazamError):
+    """Raised only if ``save_purchase()`` exhausts every retry attempt at
+    generating a unique ``purchase_ref`` under genuine, sustained
+    concurrent contention (see that function's own docstring/comment for
+    the full root-cause analysis — two concurrent transactions racing on
+    ``_generate_purchase_ref()``'s plain, unlocked ``SELECT`` + Python
+    ``max()``). In normal operation this is expected to be effectively
+    unreachable: the bounded retry loop already catches and recovers from
+    the far more common case of losing exactly one such race. Kept as a
+    real, distinct, clearly-labeled exception (never left to propagate as
+    a raw, uncaught ``IntegrityError``/500) so a caller can tell "please
+    just retry the whole request" apart from every other kind of failure
+    this function can raise.
+    """
+
+    def __init__(self, attempts: int):
+        self.attempts = attempts
+        super().__init__(
+            f"Could not generate a unique purchase reference after {attempts} attempt(s) — "
+            "please try saving this purchase again."
+        )
+
+
 class ReconciliationError(AlakazamError):
     """Raised when a purchase's line items don't sum exactly (to the
     rupiah) to its Total Amount Paid. This is the "debits = credits"
@@ -158,6 +181,29 @@ class DuplicateEbaySaleError(AlakazamError):
         )
 
 
+class DuplicatePreorderFulfillmentError(AlakazamError):
+    """Raised when a fungible depletion is posted with a
+    ``preorder_sale_id`` that already has a depletion recorded against it
+    (Milestone 7's real DB-level uniqueness backstop — see
+    migrations/005_add_preorder_sales.sql). In normal operation this is
+    expected to be unreachable: ``inventory.preorders.fulfill_preorder_sales``
+    already gates on the pre-order sale's own ``status`` via an atomic
+    ``pending`` -> ``fulfilled`` compare-and-swap before ever calling the
+    depletion engine, and never calls it twice for the same pre-order sale.
+    Kept as a real, distinct exception anyway (never silently reported as
+    ``InsufficientStockError``) so a genuine second layer of protection
+    exists even if some future code path ever calls the depletion engine
+    directly with a duplicate id.
+    """
+
+    def __init__(self, preorder_sale_id):
+        self.preorder_sale_id = preorder_sale_id
+        super().__init__(
+            f"Pre-order sale {preorder_sale_id!r} already has a depletion posted against it — "
+            "refusing to deplete it a second time."
+        )
+
+
 class ItemMismatchError(AlakazamError):
     """Raised when a depletion claims a serial/asset unit belongs to a
     given SKU, but it's actually catalogued under a different item.
@@ -170,3 +216,50 @@ class ItemMismatchError(AlakazamError):
         super().__init__(
             f"Serial/Asset unit {serial_id!r} belongs to item {actual_sku!r}, not {expected_sku!r}."
         )
+
+
+class PreorderSaleNotFoundError(AlakazamError):
+    """Raised when a pre-order sale id doesn't exist at all (Milestone 7:
+    ``inventory/preorders.py``).
+    """
+
+    def __init__(self, preorder_sale_id):
+        self.preorder_sale_id = preorder_sale_id
+        super().__init__(f"No pre-order sale with id {preorder_sale_id!r}.")
+
+
+class PreorderSaleNotPendingError(AlakazamError):
+    """Raised when an action that requires a pre-order sale to still be
+    ``pending`` (cancel, fulfill) targets one that's already ``fulfilled``
+    or ``cancelled`` — including the case where this is discovered only at
+    the real atomic compare-and-swap UPDATE (a concurrent cancel/fulfill
+    won the race a moment earlier), not just an application-level
+    pre-check. Both 'fulfilled' and 'cancelled' are terminal states in this
+    project — see CLAUDE.md's "no correction/reversal flow yet" policy.
+    """
+
+    def __init__(self, preorder_sale_id, current_status: Optional[str] = None):
+        self.preorder_sale_id = preorder_sale_id
+        self.current_status = current_status
+        if current_status:
+            message = (
+                f"Pre-order sale {preorder_sale_id} is already {current_status!r} — "
+                "only a still-pending pre-order sale can be cancelled or fulfilled."
+            )
+        else:
+            message = (
+                f"Pre-order sale {preorder_sale_id} is no longer pending — it may have "
+                "already been fulfilled or cancelled concurrently."
+            )
+        super().__init__(message)
+
+
+class PreorderItemMismatchError(AlakazamError):
+    """Raised when a fulfillment orchestration is asked to fulfill pre-order
+    sales that don't all reference the same item, or whose item doesn't
+    match any line item on the purchase supplied to fulfill them (Milestone
+    7's ``inventory.preorders.fulfill_preorder_sales``).
+    """
+
+    def __init__(self, message: str):
+        super().__init__(message)

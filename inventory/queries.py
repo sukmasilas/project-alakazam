@@ -282,10 +282,17 @@ class ItemSearchResult:
     identity_mode: str
 
 
-def search_items(conn: Connection, query: str, limit: int = 8) -> list[ItemSearchResult]:
+def search_items(
+    conn: Connection, query: str, limit: int = 8, identity_mode: Optional[str] = None
+) -> list[ItemSearchResult]:
     """Typeahead search for Purchase Entry's SKU combobox — any substring
     of SKU or item name, newest-created last (id order), capped at
-    ``limit`` (design doc: "max 8 shown").
+    ``limit`` (design doc: "max 8 shown"). ``identity_mode`` (Milestone 7
+    addition — optional, defaults to no filter, so every pre-existing
+    caller is unaffected) narrows results to just ``'fungible'`` or
+    ``'serialized'`` items — used by the Pre-Order Sales screen's item
+    picker, which must only ever offer fungible items (see
+    ``inventory/preorders.py``'s standing fungible-only rule).
     """
     pattern = f"%{query}%"
     rows = conn.execute(
@@ -294,12 +301,13 @@ def search_items(conn: Connection, query: str, limit: int = 8) -> list[ItemSearc
             SELECT i.sku, i.name, i.identity_mode, c.code AS category_code, c.name AS category_name
             FROM items i
             JOIN categories c ON c.id = i.category_id
-            WHERE i.sku ILIKE :pattern OR i.name ILIKE :pattern
+            WHERE (i.sku ILIKE :pattern OR i.name ILIKE :pattern)
+              AND (:identity_mode IS NULL OR i.identity_mode = :identity_mode)
             ORDER BY i.id
             LIMIT :limit
             """
         ),
-        {"pattern": pattern, "limit": limit},
+        {"pattern": pattern, "limit": limit, "identity_mode": identity_mode},
     ).mappings().all()
     return [ItemSearchResult(**row) for row in rows]
 

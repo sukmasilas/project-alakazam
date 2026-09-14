@@ -26,6 +26,13 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 # explicit list (not introspection) so drop_schema() can never accidentally
 # reach a database it shouldn't and drop something unexpected.
 _ALL_OBJECTS_NEWEST_FIRST = [
+    # Migration 005 (Milestone 7 — pre-order/dropship sales). The
+    # `preorder_sale_id` column/partial unique index added to
+    # fungible_depletions needs no separate entry — that whole table is
+    # already dropped (CASCADE) further down under migration 003.
+    ("TRIGGER", "trg_check_preorder_sale_item_is_fungible ON preorder_sales"),
+    ("FUNCTION", "check_preorder_sale_item_is_fungible()"),
+    ("TABLE", "preorder_sales"),
     # Migration 004 (Milestone 6 — eBay sales CSV import / review queue).
     # DROP TABLE ... CASCADE below removes the new columns/partial unique
     # indexes this migration adds to fungible_depletions/serial_units too

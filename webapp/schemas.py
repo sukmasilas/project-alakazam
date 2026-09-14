@@ -159,3 +159,27 @@ class SerialDepletionIn(BaseModel):
 class EbayRowMatchIn(BaseModel):
     sku: str
     serial_ids: Optional[list[str]] = None
+
+
+# --------------------------------------------------------------------- #
+# Milestone 7 — pre-order/dropship sales
+# --------------------------------------------------------------------- #
+
+
+class PreorderSaleCreateIn(BaseModel):
+    sku: str
+    quantity: int
+    sale_date: Optional[date] = None
+    reference: Optional[str] = None
+
+
+class PreorderFulfillIn(BaseModel):
+    preorder_sale_ids: list[int]
+    # Exactly one of the two below must be set — enforced server-side by
+    # inventory.preorders.fulfill_preorder_sales(), never trusted from the
+    # client. ``purchase`` reuses the SAME ``PurchaseIn`` shape as
+    # /api/purchases (see ``to_purchase_input`` above) — no separate,
+    # simplified purchase schema, so a fulfillment purchase gets the exact
+    # same real validation/allocation engine as any other purchase.
+    purchase: Optional[PurchaseIn] = None
+    purchase_id: Optional[int] = None

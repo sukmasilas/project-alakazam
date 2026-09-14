@@ -601,6 +601,110 @@ class TestGenuineConcurrencyLeavesConnectionUsable:
             assert count == 1
 
 
+class TestPurchaseRefGenerationGenuineConcurrency:
+    """QA-found bug (Milestone 7, 2026-09-14), pre-existing since Milestone
+    2 — not caused by pre-orders, just newly EXPOSED by Milestone 7 being
+    the first flow where two genuinely independent ``save_purchase()``
+    calls plausibly land at the same real moment.
+    ``_generate_purchase_ref()`` (a plain, unlocked ``SELECT`` + Python
+    ``max()`` — see its own docstring) lets two genuinely simultaneous
+    callers compute the SAME "next" ref before either commits; the loser
+    used to get an uncaught ``psycopg2.errors.UniqueViolation`` on
+    ``purchases_purchase_ref_key``, propagating raw (a 500 through the web
+    API) — even though the two purchases were otherwise completely
+    unrelated (different items, no pre-order or shared state at all).
+
+    Fixed with a bounded retry loop around ref-generation + the header
+    INSERT (see ``save_purchase()``'s own comment): a genuine collision now
+    regenerates a fresh ref and retries, so BOTH sides of a real race
+    succeed cleanly with distinct refs — no exception at all, on either
+    side, for this specific scenario (unlike the SKU race above, where a
+    losing DuplicateSkuError is the CORRECT outcome, since that collision
+    reflects a real, user-meaningful conflict; a purchase_ref collision
+    reflects nothing about the user's input at all).
+
+    Uses ``threading.Barrier`` for TRUE simultaneity (not the
+    event-staggered ``threading.Event`` pattern used above) — this
+    project's own established lesson (see migrations/003_add_depletions.sql
+    /tests/test_depletions.py) is that event-staggering can pass cleanly
+    while hiding a real race that only shows up under genuine, simultaneous
+    contention, which is exactly how QA originally found this bug.
+    """
+
+    TRIALS = 15
+
+    def test_two_unrelated_purchases_at_the_exact_same_instant_both_succeed(self, engine):
+        unexpected = []
+        for trial in range(self.TRIALS):
+            with engine.begin() as setup_conn:
+                seed_categories(setup_conn)
+
+            barrier = threading.Barrier(2, timeout=10)
+            results: dict = {}
+
+            def build_purchase(name: str) -> PurchaseInput:
+                # Deliberately single-word, mutually-distinct item names
+                # (not e.g. "Ref Race Widget A"/"Ref Race Widget B", which
+                # share the same first-two-words SKU slug — see
+                # inventory/sku.py::slugify_name) so the two racers can
+                # NEVER collide on SKU generation itself. That's a real,
+                # separate, already-covered invariant
+                # (TestGenuineConcurrencyLeavesConnectionUsable above) —
+                # this test isolates ONLY the purchase_ref race.
+                item_name = f"RefRace{name.upper()}Trial{trial}"
+                return PurchaseInput(
+                    purchase_date=date(2026, 9, 14),
+                    vendor_description=f"Unrelated purchase — {name}",
+                    total_amount_paid=Decimal("100000"),
+                    shipping_mode="none",
+                    lines=[
+                        PurchaseLineInput(
+                            new_item=_new_fungible(item_name),
+                            quantity=1,
+                            pricing_mode="direct",
+                            price_entry_mode="total",
+                            price_value=Decimal("100000"),
+                        )
+                    ],
+                )
+
+            def racer(name: str):
+                conn = engine.connect()
+                try:
+                    barrier.wait()
+                    try:
+                        saved = save_purchase(conn, build_purchase(name))
+                        conn.commit()
+                        results[name] = ("success", saved.purchase_ref)
+                    except Exception as exc:  # noqa: BLE001 — deliberately broad, see class docstring
+                        conn.rollback()
+                        results[name] = ("UNEXPECTED", f"{type(exc).__name__}:{exc}")
+                finally:
+                    conn.close()
+
+            ta = threading.Thread(target=racer, args=("a",))
+            tb = threading.Thread(target=racer, args=("b",))
+            ta.start()
+            tb.start()
+            ta.join(timeout=10)
+            tb.join(timeout=10)
+
+            if any(v[0] == "UNEXPECTED" for v in results.values()):
+                unexpected.append(results)
+                continue
+            assert results["a"][0] == "success" and results["b"][0] == "success", results
+            # Both real, unrelated purchases must land with DISTINCT refs —
+            # never the same one, and never an uncaught crash on either
+            # side.
+            assert results["a"][1] != results["b"][1], results
+
+        assert not unexpected, (
+            f"{len(unexpected)}/{self.TRIALS} trials produced an unexpected outcome "
+            f"(an uncaught exception on a legitimate concurrent save) instead of two "
+            f"clean successes with distinct refs: {unexpected}"
+        )
+
+
 class TestReconciliationInvariant:
     def test_balanced_purchase_saves_successfully(self, conn):
         result = save_purchase(
