@@ -25,10 +25,13 @@ async function loadItemDetail() {
   if (!data) return;
   lastItemData = data;
 
+  const consignorTag = data.consignor_id
+    ? ` &middot; <span class="badge badge-amber">Consigned — ${escapeAttr(data.consignor_name || ("consignor #" + data.consignor_id))}</span>`
+    : "";
   document.getElementById("detail-header").innerHTML = `
     <div>
       <div class="dh-title">${escapeAttr(data.name)}</div>
-      <div class="dh-sku">${escapeAttr(data.sku)} &middot; <span class="cat-tag">${escapeAttr(data.category_name || "")}</span> &middot; ${identityBadge(data.identity_mode)}</div>
+      <div class="dh-sku">${escapeAttr(data.sku)} &middot; <span class="cat-tag">${escapeAttr(data.category_name || "")}</span> &middot; ${identityBadge(data.identity_mode)}${consignorTag}</div>
     </div>
     <div class="detail-stat"><div class="label">On-Hand Qty</div><div class="value">${fmtQty(data.quantity)}</div></div>
     <div class="detail-stat"><div class="label">Total Cost Basis</div><div class="value">${fmtIDR(data.cost_basis)}</div></div>

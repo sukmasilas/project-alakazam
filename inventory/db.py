@@ -26,6 +26,16 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 # explicit list (not introspection) so drop_schema() can never accidentally
 # reach a database it shouldn't and drop something unexpected.
 _ALL_OBJECTS_NEWEST_FIRST = [
+    # Migration 006 (Milestone 8 — consignment tracking). The items.consignor_id
+    # column and serial_units.purchase_line_item_id becoming nullable need no
+    # separate entry — those two tables are already listed further down
+    # (migration 001) and DROP TABLE ... CASCADE removes everything about them.
+    ("TABLE", "consignor_reimbursements"),
+    ("TRIGGER", "trg_check_serial_unit_consignment_consistency ON serial_units"),
+    ("FUNCTION", "check_serial_unit_consignment_consistency()"),
+    ("TRIGGER", "trg_check_item_consignor_requires_serialized ON items"),
+    ("FUNCTION", "check_item_consignor_requires_serialized()"),
+    ("TABLE", "consignors"),
     # Migration 005 (Milestone 7 — pre-order/dropship sales). The
     # `preorder_sale_id` column/partial unique index added to
     # fungible_depletions needs no separate entry — that whole table is

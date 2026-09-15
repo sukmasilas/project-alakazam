@@ -263,3 +263,84 @@ class PreorderItemMismatchError(AlakazamError):
 
     def __init__(self, message: str):
         super().__init__(message)
+
+
+class ConsignorNotFoundError(AlakazamError):
+    """Raised when a consignor id doesn't exist at all (Milestone 8:
+    ``inventory/consignment.py``).
+    """
+
+    def __init__(self, consignor_id):
+        self.consignor_id = consignor_id
+        super().__init__(f"No consignor with id {consignor_id!r}.")
+
+
+class ItemNotConsignedError(AlakazamError):
+    """Raised when a consignment-specific flow (intake reuse of an existing
+    SKU, or ``sell_consigned_unit``) targets an item that isn't tagged to
+    any consignor at all — i.e. a genuinely owned-stock item, never treated
+    as consigned by mistake.
+    """
+
+    def __init__(self, sku: str):
+        self.sku = sku
+        super().__init__(f"Item {sku!r} is not tagged to a consignor — it is not a consigned item.")
+
+
+class ReimbursementNotFoundError(AlakazamError):
+    """Raised when a consignor reimbursement id doesn't exist at all
+    (Milestone 8: ``inventory/consignment.py``).
+    """
+
+    def __init__(self, reimbursement_id):
+        self.reimbursement_id = reimbursement_id
+        super().__init__(f"No consignor reimbursement with id {reimbursement_id!r}.")
+
+
+class ReimbursementNotUnpaidError(AlakazamError):
+    """Raised when ``mark_reimbursement_paid`` targets a reimbursement
+    that's already ``paid`` — including the case where this is discovered
+    only at the real atomic compare-and-swap UPDATE (a concurrent
+    mark-as-paid won the race a moment earlier), not just an
+    application-level pre-check. ``paid`` is a TERMINAL state in this
+    milestone — see CLAUDE.md's "no correction/reversal flow yet" policy,
+    same as every prior milestone's own terminal-state errors
+    (``PreorderSaleNotPendingError``, ``AlreadyDepletedError``).
+    """
+
+    def __init__(self, reimbursement_id, current_status: Optional[str] = None):
+        self.reimbursement_id = reimbursement_id
+        self.current_status = current_status
+        if current_status:
+            message = (
+                f"Consignor reimbursement {reimbursement_id} is already {current_status!r} — "
+                "only a still-unpaid reimbursement can be marked as paid."
+            )
+        else:
+            message = (
+                f"Consignor reimbursement {reimbursement_id} is no longer unpaid — it may have "
+                "already been marked paid concurrently."
+            )
+        super().__init__(message)
+
+
+class ReimbursementAlreadyExistsError(AlakazamError):
+    """Defensive safety net: raised if a consignor reimbursement is ever
+    posted for a serial unit that already has one (Milestone 8's real
+    DB-level uniqueness backstop — see migrations/006_add_consignment.sql's
+    ``consignor_reimbursements.serial_unit_id UNIQUE`` constraint). In
+    normal operation this is expected to be unreachable:
+    ``deplete_serial_unit()``'s own atomic ``on_hand -> sold`` compare-and-
+    swap already ensures a given unit can only ever be sold (and therefore
+    reimbursement-recorded) once. Kept as a real, distinct exception anyway
+    — never silently reported as a different error — so a genuine second
+    layer of protection exists even if some future code path ever calls
+    ``sell_consigned_unit`` twice for the same already-sold unit.
+    """
+
+    def __init__(self, serial_id: str):
+        self.serial_id = serial_id
+        super().__init__(
+            f"Serial/Asset unit {serial_id!r} already has a consignor reimbursement recorded — "
+            "refusing to create a second one."
+        )

@@ -54,3 +54,21 @@ def register_page_routes(app, templates: Jinja2Templates) -> None:
         return templates.TemplateResponse(
             request, "preorder_sales.html", {"active_nav": "preorders"}
         )
+
+    @app.get("/consignors")
+    async def consignors_page(request: Request):
+        return templates.TemplateResponse(
+            request, "consignors.html", {"active_nav": "consignors"}
+        )
+
+    @app.get("/consignment/intake")
+    async def consignment_intake_page(request: Request):
+        return templates.TemplateResponse(
+            request, "consignment_intake.html", {"active_nav": "consignment_intake"}
+        )
+
+    @app.get("/consignment/reimbursements")
+    async def consignor_reimbursements_page(request: Request):
+        return templates.TemplateResponse(
+            request, "consignor_reimbursements.html", {"active_nav": "reimbursements"}
+        )

@@ -55,6 +55,11 @@ class Item:
     name: str
     category_id: int
     identity_mode: str
+    # Milestone 8 addition — optional, defaults to None so every pre-existing
+    # construction of this dataclass (e.g. inventory/items.py::create_item,
+    # which never sets this) is entirely unaffected. Non-None only for a
+    # consigned item — see inventory/consignment.py.
+    consignor_id: Optional[int] = None
 
 
 def get_category_by_code(conn: Connection, code: str) -> Optional[Category]:
@@ -68,7 +73,7 @@ def get_category_by_code(conn: Connection, code: str) -> Optional[Category]:
 def get_item_by_sku(conn: Connection, sku: str) -> Optional[Item]:
     row = conn.execute(
         text(
-            "SELECT id, sku, name, category_id, identity_mode FROM items "
+            "SELECT id, sku, name, category_id, identity_mode, consignor_id FROM items "
             "WHERE UPPER(sku) = UPPER(:sku)"
         ),
         {"sku": sku},

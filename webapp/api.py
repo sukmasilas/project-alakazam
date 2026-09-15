@@ -22,6 +22,7 @@ from sqlalchemy.engine import Connection
 
 from ingestion import ebay_import as ebay_import_engine
 from ingestion.ebay_csv import EbayCsvFormatError
+from inventory import consignment as consignment_engine
 from inventory import depletions as depletions_engine
 from inventory import items as items_engine
 from inventory import preorders as preorders_engine
@@ -33,12 +34,15 @@ from inventory import uniqueness
 from inventory.exceptions import AlakazamError
 from webapp.dbdep import get_read_conn, get_write_conn
 from webapp.schemas import (
+    ConsignmentIntakeIn,
+    ConsignorCreateIn,
     EbayRowMatchIn,
     FungibleDepletionIn,
     NewItemCreateIn,
     PreorderFulfillIn,
     PreorderSaleCreateIn,
     PurchaseIn,
+    ReimbursementMarkPaidIn,
     SerialDepletionIn,
     to_purchase_input,
 )
@@ -142,6 +146,11 @@ def api_item_detail(sku: str, conn: Connection = Depends(get_read_conn)):
             category = c
             break
 
+    consignor_name = None
+    if item.consignor_id is not None:
+        consignor = consignment_engine.get_consignor(conn, item.consignor_id)
+        consignor_name = consignor.name if consignor else None
+
     payload = {
         "sku": item.sku,
         "name": item.name,
@@ -150,6 +159,10 @@ def api_item_detail(sku: str, conn: Connection = Depends(get_read_conn)):
         "category_name": category.name if category else None,
         "quantity": stats.quantity,
         "cost_basis": stats.cost_basis,
+        # Milestone 8 — None for every ordinary (non-consigned) item, so
+        # every pre-existing caller/test of this endpoint is unaffected.
+        "consignor_id": item.consignor_id,
+        "consignor_name": consignor_name,
     }
     if item.identity_mode == "serialized":
         payload["serialized_units"] = queries.get_serialized_unit_rows(conn, item.id)
@@ -277,6 +290,28 @@ def api_deplete_fungible(sku: str, body: FungibleDepletionIn, conn: Connection =
 def api_deplete_serial_unit(
     sku: str, serial_id: str, body: SerialDepletionIn, conn: Connection = Depends(get_write_conn)
 ):
+    # Milestone 8: one consistent "Mark as Sold" entry point regardless of
+    # whether the unit belongs to owned stock or a consigned item — the
+    # client never needs to know which ahead of time (same button, same
+    # endpoint). If the item is tagged to a consignor, route to the real
+    # consignment orchestration (real depletion + a new unpaid reimbursement
+    # record, same transaction) instead of the plain depletion engine. See
+    # inventory/consignment.py::sell_consigned_unit and this milestone's
+    # report for the full reasoning.
+    item = queries.get_item_by_sku(conn, sku)
+    if item is not None and item.consignor_id is not None:
+        try:
+            result = consignment_engine.sell_consigned_unit(
+                conn,
+                serial_id=serial_id,
+                expected_sku=sku,
+                sold_date=body.sold_date,
+                reference=body.reference,
+            )
+        except AlakazamError as exc:
+            raise _error_response(exc) from exc
+        return serialize(result)
+
     try:
         result = depletions_engine.deplete_serial_unit(
             conn,
@@ -284,6 +319,72 @@ def api_deplete_serial_unit(
             expected_sku=sku,
             sold_date=body.sold_date,
             reference=body.reference,
+        )
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+# --------------------------------------------------------------------- #
+# Milestone 8 — consignment tracking. Every endpoint here calls straight
+# into inventory.consignment, which itself never reimplements
+# inventory.depletions.deplete_serial_unit() — same discipline as every
+# prior milestone. The server is always authoritative (a client-supplied
+# consignor_id/sku/status is never trusted beyond what the real engine
+# actually accepts).
+# --------------------------------------------------------------------- #
+
+
+@router.get("/consignors")
+def api_list_consignors(conn: Connection = Depends(get_read_conn)):
+    return serialize(consignment_engine.list_consignors(conn))
+
+
+@router.post("/consignors", status_code=201)
+def api_create_consignor(body: ConsignorCreateIn, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = consignment_engine.create_consignor(conn, name=body.name, contact_info=body.contact_info)
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+@router.post("/consignment/intake", status_code=201)
+def api_consignment_intake(body: ConsignmentIntakeIn, conn: Connection = Depends(get_write_conn)):
+    intake = consignment_engine.ConsignmentIntakeInput(
+        consignor_id=body.consignor_id,
+        sku=body.sku,
+        new_item_name=body.new_item_name,
+        new_item_category_code=body.new_item_category_code,
+        new_item_sku=body.new_item_sku,
+        quantity=body.quantity,
+        serial_ids=body.serial_ids,
+        photo_references=body.photo_references,
+    )
+    try:
+        result = consignment_engine.intake_consigned_units(conn, intake)
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
+
+
+@router.get("/consignment/reimbursements")
+def api_list_reimbursements(
+    consignor_id: Optional[int] = None, status: Optional[str] = None, conn: Connection = Depends(get_read_conn)
+):
+    return serialize(consignment_engine.list_reimbursements(conn, consignor_id=consignor_id, status=status))
+
+
+@router.post("/consignment/reimbursements/{reimbursement_id}/mark-paid")
+def api_mark_reimbursement_paid(
+    reimbursement_id: int, body: ReimbursementMarkPaidIn, conn: Connection = Depends(get_write_conn)
+):
+    try:
+        result = consignment_engine.mark_reimbursement_paid(
+            conn,
+            reimbursement_id,
+            paid_date=body.paid_date,
+            payment_reference=body.payment_reference,
         )
     except AlakazamError as exc:
         raise _error_response(exc) from exc

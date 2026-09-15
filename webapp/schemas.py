@@ -183,3 +183,34 @@ class PreorderFulfillIn(BaseModel):
     # same real validation/allocation engine as any other purchase.
     purchase: Optional[PurchaseIn] = None
     purchase_id: Optional[int] = None
+
+
+# --------------------------------------------------------------------- #
+# Milestone 8 — consignment tracking
+# --------------------------------------------------------------------- #
+
+
+class ConsignorCreateIn(BaseModel):
+    name: str
+    contact_info: Optional[str] = None
+
+
+class ConsignmentIntakeIn(BaseModel):
+    consignor_id: int
+
+    # Exactly one of the two below must be given — enforced server-side by
+    # inventory.consignment.intake_consigned_units(), never trusted from
+    # the client.
+    sku: Optional[str] = None
+    new_item_name: Optional[str] = None
+    new_item_category_code: Optional[str] = None
+    new_item_sku: Optional[str] = None
+
+    quantity: int = 1
+    serial_ids: Optional[list[str]] = None
+    photo_references: Optional[list[str]] = None
+
+
+class ReimbursementMarkPaidIn(BaseModel):
+    paid_date: Optional[date] = None
+    payment_reference: Optional[str] = None

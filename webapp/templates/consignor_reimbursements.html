@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Consignor Reimbursements{% endblock %}
+{% block page_title %}Consignor Reimbursements{% endblock %}
+{% block content %}
+<h1>Consignor Reimbursements</h1>
+<div class="subtitle">One record per sold consigned unit — a paid/unpaid STATUS only, never an amount. Project-Noctrowl computes the actual Rupiah owed to the consignor (item price × one of two live payout formulas, decided manually per-sale there); this screen exists purely so it's visible at a glance which consignors are still owed a reimbursement.</div>
+
+<div class="control-box">
+  <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+    <label style="font-size:12.5px;">Consignor:
+      <select id="cr-consignor-filter"><option value="">All</option></select>
+    </label>
+    <label style="font-size:12.5px;">Status:
+      <select id="cr-status-filter">
+        <option value="unpaid" selected>Unpaid</option>
+        <option value="paid">Paid</option>
+        <option value="">All</option>
+      </select>
+    </label>
+    <button class="btn btn-sm" id="cr-refresh">Refresh</button>
+  </div>
+</div>
+
+<div id="cr-list">Loading…</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/consignor_reimbursements.js"></script>{% endblock %}

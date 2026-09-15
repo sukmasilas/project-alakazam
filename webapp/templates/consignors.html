@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Consignors{% endblock %}
+{% block page_title %}Consignors{% endblock %}
+{% block content %}
+<h1>Consignors</h1>
+<div class="subtitle">Third parties whose items the seller physically holds and lists on their behalf, but never owns. Deliberately simple — not a full CRM; consignor-level relationship/operational detail lives in a separate system. See Consignment Intake to add consigned items, and Consignor Reimbursements to track paid/unpaid status per sold unit.</div>
+
+<div class="control-box">
+  <div class="control-box-title">Add a new consignor</div>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <div class="lfield" style="flex:1;min-width:200px;"><label style="display:block;font-size:12px;margin-bottom:4px;">Name</label><input type="text" id="c-name" placeholder="e.g. Budi Santoso"></div>
+    <div class="lfield" style="flex:1;min-width:200px;"><label style="display:block;font-size:12px;margin-bottom:4px;">Contact Info (optional)</label><input type="text" id="c-contact" placeholder="e.g. WhatsApp: 0812-xxxx-xxxx"></div>
+    <button class="btn btn-primary btn-sm" id="c-submit">Add Consignor</button>
+  </div>
+  <div id="c-create-error" style="margin-top:8px;color:var(--red-text);font-size:12.5px;"></div>
+</div>
+
+<div id="c-list">Loading…</div>
+{% endblock %}
+{% block scripts %}<script src="/static/js/consignors.js"></script>{% endblock %}
