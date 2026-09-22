@@ -1,8 +1,10 @@
 """App configuration — every value comes from the environment (optionally
-via a local ``.env``, loaded with python-dotenv), never hardcoded. Mirrors
-Project-Noctrowl's own ``APP_LOGIN_USERNAME``/``APP_LOGIN_PASSWORD`` pattern
-with Alakazam-specific env var names (CLAUDE.md's Architecture section /
-this milestone's brief).
+via a local ``.env``, loaded with python-dotenv), never hardcoded.
+
+As of 2026-09-22, this app has no login gate of its own (see webapp/app.py's
+module docstring for the full security implication) — the
+``ALAKAZAM_LOGIN_USERNAME``/``ALAKAZAM_LOGIN_PASSWORD``/``ALAKAZAM_SECRET_KEY``
+env vars that used to be required here are gone.
 """
 from __future__ import annotations
 
@@ -33,9 +35,6 @@ def _require_env(name: str) -> str:
 @dataclass(frozen=True)
 class Settings:
     database_url: str
-    login_username: str
-    login_password: str
-    secret_key: str
 
 
 def get_settings() -> Settings:
@@ -44,7 +43,4 @@ def get_settings() -> Settings:
     """
     return Settings(
         database_url=_require_env("DATABASE_URL"),
-        login_username=_require_env("ALAKAZAM_LOGIN_USERNAME"),
-        login_password=_require_env("ALAKAZAM_LOGIN_PASSWORD"),
-        secret_key=_require_env("ALAKAZAM_SECRET_KEY"),
     )

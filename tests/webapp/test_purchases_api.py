@@ -24,7 +24,7 @@ def _fungible_line(sku=None, new_item=None, quantity=10, price_value=1000, price
     return line
 
 
-def test_balanced_purchase_saves_through_real_engine(auth_client, engine):
+def test_balanced_purchase_saves_through_real_engine(client, engine):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": "Toko Grosir Jaya",
@@ -38,7 +38,7 @@ def test_balanced_purchase_saves_through_real_engine(auth_client, engine):
             )
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 201, resp.text
     saved = resp.json()
     assert saved["purchase_ref"].startswith("PUR-2026-")
@@ -54,7 +54,7 @@ def test_balanced_purchase_saves_through_real_engine(auth_client, engine):
     assert int(row[0]) == 10000
 
 
-def test_out_of_balance_purchase_rejected_by_real_server_check(auth_client, engine):
+def test_out_of_balance_purchase_rejected_by_real_server_check(client, engine):
     """Even if a hypothetical malicious/broken client claims a purchase is
     balanced, the wire payload here deliberately does NOT balance —
     proving the server (not client JS) is the actual gate.
@@ -72,7 +72,7 @@ def test_out_of_balance_purchase_rejected_by_real_server_check(auth_client, engi
             )
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "ReconciliationError"
 
@@ -85,7 +85,7 @@ def test_out_of_balance_purchase_rejected_by_real_server_check(auth_client, engi
     assert item_count == 0, "A rejected purchase's new item must not be created either."
 
 
-def test_duplicate_sku_within_purchase_rejected(auth_client):
+def test_duplicate_sku_within_purchase_rejected(client):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": "Two lines, same new SKU",
@@ -103,13 +103,13 @@ def test_duplicate_sku_within_purchase_rejected(auth_client):
             ),
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "DuplicateSkuError"
 
 
-def test_duplicate_sku_against_existing_item_rejected(auth_client):
-    auth_client.post("/api/items", json={"name": "Existing Item", "category_code": "OTHERS", "identity_mode": "fungible", "sku": "OTH-EXIST-0001"})
+def test_duplicate_sku_against_existing_item_rejected(client):
+    client.post("/api/items", json={"name": "Existing Item", "category_code": "OTHERS", "identity_mode": "fungible", "sku": "OTH-EXIST-0001"})
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": "Reuses an existing SKU as if new",
@@ -123,12 +123,12 @@ def test_duplicate_sku_against_existing_item_rejected(auth_client):
             )
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "DuplicateSkuError"
 
 
-def test_serialized_purchase_generates_real_serials_and_enforces_uniqueness(auth_client):
+def test_serialized_purchase_generates_real_serials_and_enforces_uniqueness(client):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": "Watch pair",
@@ -147,13 +147,13 @@ def test_serialized_purchase_generates_real_serials_and_enforces_uniqueness(auth
             }
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 201, resp.text
     saved = resp.json()
     assert sorted(saved["lines"][0]["serial_ids"]) == ["SEIKO-001", "SEIKO-002"]
 
     # Real uniqueness check endpoint now reflects the posted serials.
-    check = auth_client.get("/api/serials/check?serial_id=SEIKO-001").json()
+    check = client.get("/api/serials/check?serial_id=SEIKO-001").json()
     assert check["exists"] is True
 
     # A second purchase reusing one of those serial IDs must be rejected —
@@ -177,12 +177,12 @@ def test_serialized_purchase_generates_real_serials_and_enforces_uniqueness(auth
             }
         ],
     }
-    dupe_resp = auth_client.post("/api/purchases", json=dupe_body)
+    dupe_resp = client.post("/api/purchases", json=dupe_body)
     assert dupe_resp.status_code == 400
     assert dupe_resp.json()["detail"]["error_type"] == "DuplicateSerialError"
 
 
-def test_purchase_history_list_and_detail(auth_client):
+def test_purchase_history_list_and_detail(client):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": "History Vendor",
@@ -196,21 +196,21 @@ def test_purchase_history_list_and_detail(auth_client):
             )
         ],
     }
-    saved = auth_client.post("/api/purchases", json=body).json()
+    saved = client.post("/api/purchases", json=body).json()
     ref = saved["purchase_ref"]
 
-    listing = auth_client.get("/api/purchases").json()
+    listing = client.get("/api/purchases").json()
     assert any(p["purchase_ref"] == ref for p in listing)
 
-    detail = auth_client.get(f"/api/purchases/{ref}").json()
+    detail = client.get(f"/api/purchases/{ref}").json()
     assert detail["vendor_description"] == "History Vendor"
     assert detail["lines"][0]["sku"].startswith("OTH-HISTORY-ITEM")
 
-    missing = auth_client.get("/api/purchases/PUR-2026-9999")
+    missing = client.get("/api/purchases/PUR-2026-9999")
     assert missing.status_code == 404
 
 
-def test_item_detail_shows_purchase_history_row(auth_client):
+def test_item_detail_shows_purchase_history_row(client):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": "Detail Vendor",
@@ -224,17 +224,17 @@ def test_item_detail_shows_purchase_history_row(auth_client):
             )
         ],
     }
-    saved = auth_client.post("/api/purchases", json=body).json()
+    saved = client.post("/api/purchases", json=body).json()
     sku = saved["lines"][0]["sku"]
 
-    detail = auth_client.get(f"/api/items/{sku}").json()
+    detail = client.get(f"/api/items/{sku}").json()
     assert detail["quantity"] == 3
     assert detail["cost_basis"] == "3000"
     assert len(detail["fungible_rows"]) == 1
     assert detail["fungible_rows"][0]["purchase_ref"] == saved["purchase_ref"]
 
 
-def test_item_detail_money_fields_are_strings_not_floats(auth_client):
+def test_item_detail_money_fields_are_strings_not_floats(client):
     """Regression test (QA-found bug, 2026-09-10): GET /api/items/{sku} was
     leaking raw JSON floats for money fields nested inside hand-built dict
     payloads (fungible_rows / serialized_units), even though the
@@ -258,10 +258,10 @@ def test_item_detail_money_fields_are_strings_not_floats(auth_client):
             )
         ],
     }
-    saved = auth_client.post("/api/purchases", json=fungible_body).json()
+    saved = client.post("/api/purchases", json=fungible_body).json()
     sku = saved["lines"][0]["sku"]
 
-    detail = auth_client.get(f"/api/items/{sku}").json()
+    detail = client.get(f"/api/items/{sku}").json()
     row = detail["fungible_rows"][0]
     assert isinstance(row["line_total"], str)
     assert isinstance(row["allocated_unit_cost"], str)
@@ -286,10 +286,10 @@ def test_item_detail_money_fields_are_strings_not_floats(auth_client):
             }
         ],
     }
-    saved_serialized = auth_client.post("/api/purchases", json=serialized_body).json()
+    saved_serialized = client.post("/api/purchases", json=serialized_body).json()
     serialized_sku = saved_serialized["lines"][0]["sku"]
 
-    serialized_detail = auth_client.get(f"/api/items/{serialized_sku}").json()
+    serialized_detail = client.get(f"/api/items/{serialized_sku}").json()
     unit = serialized_detail["serialized_units"][0]
     assert isinstance(unit["cost"], str)
     assert unit["cost"] == "5000"

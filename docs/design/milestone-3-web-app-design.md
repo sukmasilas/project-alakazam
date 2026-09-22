@@ -1,5 +1,15 @@
 # Web App — Milestone 3 (Project-Alakazam)
 
+**Superseded, 2026-09-22**: the login gate described below (`webapp/auth.py`,
+`LoginRequiredMiddleware`, `ALAKAZAM_LOGIN_USERNAME`/`ALAKAZAM_LOGIN_PASSWORD`/
+`ALAKAZAM_SECRET_KEY`, `/login`) has been **removed**. A new sibling project,
+Dotworks, is now the single shared login/entry point for both Alakazam and
+Noctrowl — see CLAUDE.md's "Architecture change, confirmed 2026-09-22" entry
+and `webapp/app.py`'s module docstring for the real security implication
+(Alakazam now has no authentication of its own and must never be reachable
+directly from the public internet). This section is kept as-is below for
+historical record of Milestone 3's original design, not as current behavior.
+
 Real backend + UI, built against the real Milestone 2 Postgres schema and
 business logic in `inventory/*.py`. This document covers the framework
 choice and the module layout; the screens themselves are unchanged from

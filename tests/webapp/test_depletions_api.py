@@ -9,7 +9,7 @@ from __future__ import annotations
 from sqlalchemy import text
 
 
-def _post_fungible_purchase(auth_client, name, quantity, price_value, category_code="AUTOMOTIVE"):
+def _post_fungible_purchase(client, name, quantity, price_value, category_code="AUTOMOTIVE"):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": f"Stock-up: {name}",
@@ -27,12 +27,12 @@ def _post_fungible_purchase(auth_client, name, quantity, price_value, category_c
             }
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()["lines"][0]["sku"]
 
 
-def _post_serialized_purchase(auth_client, name, total_price, serial_id, category_code="WATCHES"):
+def _post_serialized_purchase(client, name, total_price, serial_id, category_code="WATCHES"):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": f"Stock-up: {name}",
@@ -51,15 +51,15 @@ def _post_serialized_purchase(auth_client, name, total_price, serial_id, categor
             }
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()["lines"][0]["sku"]
 
 
-def test_deplete_fungible_through_real_engine(auth_client, engine):
-    sku = _post_fungible_purchase(auth_client, "Brake Pad Set", quantity=10, price_value=100_000)
+def test_deplete_fungible_through_real_engine(client, engine):
+    sku = _post_fungible_purchase(client, "Brake Pad Set", quantity=10, price_value=100_000)
 
-    resp = auth_client.post(f"/api/items/{sku}/deplete", json={"quantity": 4, "reference": "eBay #999"})
+    resp = client.post(f"/api/items/{sku}/deplete", json={"quantity": 4, "reference": "eBay #999"})
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["quantity"] == 4
@@ -86,18 +86,18 @@ def test_deplete_fungible_through_real_engine(auth_client, engine):
     assert int(row["total_cost"]) == 400_000
     assert row["reference"] == "eBay #999"
 
-    detail = auth_client.get(f"/api/items/{sku}").json()
+    detail = client.get(f"/api/items/{sku}").json()
     assert detail["quantity"] == 6
     assert detail["cost_basis"] == "600000"
 
 
-def test_deplete_fungible_over_depletion_rejected_at_api_level(auth_client, engine):
+def test_deplete_fungible_over_depletion_rejected_at_api_level(client, engine):
     """Server-side gate — a client claiming it wants to deplete more than
     is on hand must be rejected by the real API, with nothing written.
     """
-    sku = _post_fungible_purchase(auth_client, "Turbocharger Kit", quantity=3, price_value=500_000)
+    sku = _post_fungible_purchase(client, "Turbocharger Kit", quantity=3, price_value=500_000)
 
-    resp = auth_client.post(f"/api/items/{sku}/deplete", json={"quantity": 999})
+    resp = client.post(f"/api/items/{sku}/deplete", json={"quantity": 999})
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "InsufficientStockError"
 
@@ -105,21 +105,21 @@ def test_deplete_fungible_over_depletion_rejected_at_api_level(auth_client, engi
         count = conn.execute(text("SELECT COUNT(*) FROM fungible_depletions")).scalar_one()
     assert count == 0, "An over-depletion request must never partially post."
 
-    detail = auth_client.get(f"/api/items/{sku}").json()
+    detail = client.get(f"/api/items/{sku}").json()
     assert detail["quantity"] == 3
 
 
-def test_deplete_fungible_zero_quantity_rejected(auth_client):
-    sku = _post_fungible_purchase(auth_client, "Oil Filter", quantity=5, price_value=50_000)
-    resp = auth_client.post(f"/api/items/{sku}/deplete", json={"quantity": 0})
+def test_deplete_fungible_zero_quantity_rejected(client):
+    sku = _post_fungible_purchase(client, "Oil Filter", quantity=5, price_value=50_000)
+    resp = client.post(f"/api/items/{sku}/deplete", json={"quantity": 0})
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "ValidationError"
 
 
-def test_deplete_serial_unit_through_real_engine(auth_client, engine):
-    sku = _post_serialized_purchase(auth_client, "Omega Speedmaster", 15_000_000, "OMEGA-API-001")
+def test_deplete_serial_unit_through_real_engine(client, engine):
+    sku = _post_serialized_purchase(client, "Omega Speedmaster", 15_000_000, "OMEGA-API-001")
 
-    resp = auth_client.post(
+    resp = client.post(
         f"/api/items/{sku}/serial-units/OMEGA-API-001/deplete", json={"reference": "Sold via eBay"}
     )
     assert resp.status_code == 200, resp.text
@@ -134,50 +134,50 @@ def test_deplete_serial_unit_through_real_engine(auth_client, engine):
     assert row["status"] == "sold"
     assert row["sold_reference"] == "Sold via eBay"
 
-    detail = auth_client.get(f"/api/items/{sku}").json()
+    detail = client.get(f"/api/items/{sku}").json()
     assert detail["quantity"] == 0
     unit = detail["serialized_units"][0]
     assert unit["status"] == "sold"
 
 
-def test_deplete_serial_unit_already_sold_rejected(auth_client):
-    sku = _post_serialized_purchase(auth_client, "Rolex Submariner", 30_000_000, "ROLEX-API-001")
-    first = auth_client.post(f"/api/items/{sku}/serial-units/ROLEX-API-001/deplete", json={})
+def test_deplete_serial_unit_already_sold_rejected(client):
+    sku = _post_serialized_purchase(client, "Rolex Submariner", 30_000_000, "ROLEX-API-001")
+    first = client.post(f"/api/items/{sku}/serial-units/ROLEX-API-001/deplete", json={})
     assert first.status_code == 200
 
-    second = auth_client.post(f"/api/items/{sku}/serial-units/ROLEX-API-001/deplete", json={})
+    second = client.post(f"/api/items/{sku}/serial-units/ROLEX-API-001/deplete", json={})
     assert second.status_code == 400
     assert second.json()["detail"]["error_type"] == "AlreadyDepletedError"
 
 
-def test_deplete_serial_unit_wrong_item_claim_rejected(auth_client):
-    sku_a = _post_serialized_purchase(auth_client, "Watch A", 1_000_000, "WATCHA-API-001")
-    sku_b = _post_serialized_purchase(auth_client, "Watch B", 1_000_000, "WATCHB-API-001")
+def test_deplete_serial_unit_wrong_item_claim_rejected(client):
+    sku_a = _post_serialized_purchase(client, "Watch A", 1_000_000, "WATCHA-API-001")
+    sku_b = _post_serialized_purchase(client, "Watch B", 1_000_000, "WATCHB-API-001")
 
-    resp = auth_client.post(f"/api/items/{sku_b}/serial-units/WATCHA-API-001/deplete", json={})
+    resp = client.post(f"/api/items/{sku_b}/serial-units/WATCHA-API-001/deplete", json={})
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "ItemMismatchError"
 
     # Still on hand under its real item.
-    detail = auth_client.get(f"/api/items/{sku_a}").json()
+    detail = client.get(f"/api/items/{sku_a}").json()
     assert detail["quantity"] == 1
 
 
-def test_deplete_nonexistent_serial_unit_rejected(auth_client):
-    sku = _post_serialized_purchase(auth_client, "Watch C", 1_000_000, "WATCHC-API-001")
-    resp = auth_client.post(f"/api/items/{sku}/serial-units/DOES-NOT-EXIST/deplete", json={})
+def test_deplete_nonexistent_serial_unit_rejected(client):
+    sku = _post_serialized_purchase(client, "Watch C", 1_000_000, "WATCHC-API-001")
+    resp = client.post(f"/api/items/{sku}/serial-units/DOES-NOT-EXIST/deplete", json={})
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "SerialUnitNotFoundError"
 
 
-def test_depletions_log_endpoint_lists_both_kinds_newest_first(auth_client):
-    fungible_sku = _post_fungible_purchase(auth_client, "Spark Plug", quantity=20, price_value=25_000)
-    serial_sku = _post_serialized_purchase(auth_client, "ECU Unit", 5_000_000, "ECU-API-001", category_code="AUTOMOTIVE")
+def test_depletions_log_endpoint_lists_both_kinds_newest_first(client):
+    fungible_sku = _post_fungible_purchase(client, "Spark Plug", quantity=20, price_value=25_000)
+    serial_sku = _post_serialized_purchase(client, "ECU Unit", 5_000_000, "ECU-API-001", category_code="AUTOMOTIVE")
 
-    auth_client.post(f"/api/items/{fungible_sku}/deplete", json={"quantity": 5, "reference": "batch sale"})
-    auth_client.post(f"/api/items/{serial_sku}/serial-units/ECU-API-001/deplete", json={"reference": "single sale"})
+    client.post(f"/api/items/{fungible_sku}/deplete", json={"quantity": 5, "reference": "batch sale"})
+    client.post(f"/api/items/{serial_sku}/serial-units/ECU-API-001/deplete", json={"reference": "single sale"})
 
-    listing = auth_client.get("/api/depletions").json()
+    listing = client.get("/api/depletions").json()
     assert len(listing) == 2
     types = {row["depletion_type"] for row in listing}
     assert types == {"fungible", "serialized"}
@@ -185,19 +185,19 @@ def test_depletions_log_endpoint_lists_both_kinds_newest_first(auth_client):
         assert isinstance(row["total_cost"], str)
         assert isinstance(row["unit_cost"], str)
 
-    filtered = auth_client.get(f"/api/depletions?sku={fungible_sku}").json()
+    filtered = client.get(f"/api/depletions?sku={fungible_sku}").json()
     assert len(filtered) == 1
     assert filtered[0]["sku"] == fungible_sku
 
 
-def test_sales_log_page_renders(auth_client):
-    resp = auth_client.get("/sales")
+def test_sales_log_page_renders(client):
+    resp = client.get("/sales")
     assert resp.status_code == 200
     assert "Sales / Depletion Log" in resp.text
     assert "sales_log.js" in resp.text
 
 
-def test_purchase_history_unaffected_by_depletion_through_api(auth_client):
+def test_purchase_history_unaffected_by_depletion_through_api(client):
     """The same invariant CLAUDE.md's brief calls out, exercised through
     the real HTTP layer this time: a purchase's own recorded line figures
     must never change because of a later, separate depletion event.
@@ -219,13 +219,13 @@ def test_purchase_history_unaffected_by_depletion_through_api(auth_client):
             }
         ],
     }
-    saved = auth_client.post("/api/purchases", json=body).json()
+    saved = client.post("/api/purchases", json=body).json()
     ref = saved["purchase_ref"]
     sku = saved["lines"][0]["sku"]
 
-    before = auth_client.get(f"/api/purchases/{ref}").json()
-    auth_client.post(f"/api/items/{sku}/deplete", json={"quantity": 4})
-    after = auth_client.get(f"/api/purchases/{ref}").json()
+    before = client.get(f"/api/purchases/{ref}").json()
+    client.post(f"/api/items/{sku}/deplete", json={"quantity": 4})
+    after = client.get(f"/api/purchases/{ref}").json()
 
     assert before["lines"][0]["allocated_item_cost"] == after["lines"][0]["allocated_item_cost"] == "1000000"
     assert before["lines"][0]["line_total"] == after["lines"][0]["line_total"] == "1000000"

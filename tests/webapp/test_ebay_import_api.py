@@ -36,7 +36,7 @@ def _order_row(order_no, txn_id, title, qty=1):
     )
 
 
-def _post_fungible_purchase(auth_client, name, quantity, price_value, category_code="AUTOMOTIVE"):
+def _post_fungible_purchase(client, name, quantity, price_value, category_code="AUTOMOTIVE"):
     body = {
         "purchase_date": "2026-09-08",
         "vendor_description": f"Stock-up: {name}",
@@ -54,20 +54,20 @@ def _post_fungible_purchase(auth_client, name, quantity, price_value, category_c
             }
         ],
     }
-    resp = auth_client.post("/api/purchases", json=body)
+    resp = client.post("/api/purchases", json=body)
     assert resp.status_code == 201, resp.text
     return resp.json()["lines"][0]["sku"]
 
 
-def _upload(auth_client, filename, rows):
+def _upload(client, filename, rows):
     files = {"file": (filename, io.BytesIO(_csv_bytes(rows)), "text/csv")}
-    return auth_client.post("/api/ebay-import/upload", files=files)
+    return client.post("/api/ebay-import/upload", files=files)
 
 
 class TestUploadEndpoint:
-    def test_upload_parses_and_stores_real_csv_bytes(self, auth_client, engine):
+    def test_upload_parses_and_stores_real_csv_bytes(self, client, engine):
         resp = _upload(
-            auth_client,
+            client,
             "aug.csv",
             [_order_row("11-00000-00001", "9000000001", "Widget A"), _order_row("11-00000-00002", "9000000002", "Widget B", qty=2)],
         )
@@ -80,44 +80,37 @@ class TestUploadEndpoint:
             count = conn.execute(text("SELECT COUNT(*) FROM ebay_sales_rows")).scalar_one()
         assert count == 2
 
-    def test_reuploading_the_same_file_does_not_double_store(self, auth_client):
+    def test_reuploading_the_same_file_does_not_double_store(self, client):
         rows = [_order_row("11-00000-00001", "9000000001", "Widget A")]
-        first = _upload(auth_client, "aug.csv", rows)
-        second = _upload(auth_client, "aug.csv", rows)
+        first = _upload(client, "aug.csv", rows)
+        second = _upload(client, "aug.csv", rows)
         assert first.json()["order_rows_stored"] == 1
         assert second.json()["order_rows_stored"] == 0
         assert second.json()["order_rows_duplicate"] == 1
 
-    def test_upload_requires_login(self, client):
-        resp = client.post(
-            "/api/ebay-import/upload",
-            files={"file": ("x.csv", io.BytesIO(b"not,real,csv"), "text/csv")},
-        )
-        assert resp.status_code in (401, 303)
-
-    def test_malformed_file_returns_a_clean_400_not_a_500(self, auth_client):
+    def test_malformed_file_returns_a_clean_400_not_a_500(self, client):
         files = {"file": ("bad.csv", io.BytesIO(b"not,a,real,ebay,export\n1,2,3,4,5\n"), "text/csv")}
-        resp = auth_client.post("/api/ebay-import/upload", files=files)
+        resp = client.post("/api/ebay-import/upload", files=files)
         assert resp.status_code == 400
         assert resp.json()["detail"]["error_type"] == "EbayCsvFormatError"
 
 
 class TestReviewFlowThroughApi:
-    def test_full_match_then_process_flow_for_a_fungible_row(self, auth_client, engine):
-        sku = _post_fungible_purchase(auth_client, "Brake Pad Set", quantity=10, price_value=100_000)
-        upload_resp = _upload(auth_client, "aug.csv", [_order_row("11-00000-00001", "9000000001", "Brake Pad Set", qty=3)])
+    def test_full_match_then_process_flow_for_a_fungible_row(self, client, engine):
+        sku = _post_fungible_purchase(client, "Brake Pad Set", quantity=10, price_value=100_000)
+        upload_resp = _upload(client, "aug.csv", [_order_row("11-00000-00001", "9000000001", "Brake Pad Set", qty=3)])
         batch_id = upload_resp.json()["batch_id"]
 
-        rows = auth_client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()
+        rows = client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()
         assert len(rows) == 1
         row_id = rows[0]["id"]
         assert rows[0]["review_status"] == "pending"
 
-        match_resp = auth_client.post(f"/api/ebay-import/rows/{row_id}/match", json={"sku": sku})
+        match_resp = client.post(f"/api/ebay-import/rows/{row_id}/match", json={"sku": sku})
         assert match_resp.status_code == 200, match_resp.text
         assert match_resp.json()["review_status"] == "matched"
 
-        process_resp = auth_client.post(f"/api/ebay-import/process?batch_id={batch_id}", json={})
+        process_resp = client.post(f"/api/ebay-import/process?batch_id={batch_id}", json={})
         assert process_resp.status_code == 200, process_resp.text
         results = process_resp.json()
         assert len(results) == 1
@@ -133,28 +126,28 @@ class TestReviewFlowThroughApi:
             ).scalar_one()
         assert qty == 3
 
-        posted_row = auth_client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]
+        posted_row = client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]
         assert posted_row["review_status"] == "posted"
 
-    def test_skip_action_never_depletes_anything(self, auth_client, engine):
-        _post_fungible_purchase(auth_client, "Oil Filter", quantity=5, price_value=50_000)
-        upload_resp = _upload(auth_client, "aug.csv", [_order_row("11-00000-00001", "9000000001", "Oil Filter")])
+    def test_skip_action_never_depletes_anything(self, client, engine):
+        _post_fungible_purchase(client, "Oil Filter", quantity=5, price_value=50_000)
+        upload_resp = _upload(client, "aug.csv", [_order_row("11-00000-00001", "9000000001", "Oil Filter")])
         batch_id = upload_resp.json()["batch_id"]
-        row_id = auth_client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]["id"]
+        row_id = client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]["id"]
 
-        skip_resp = auth_client.post(f"/api/ebay-import/rows/{row_id}/skip")
+        skip_resp = client.post(f"/api/ebay-import/rows/{row_id}/skip")
         assert skip_resp.status_code == 200
         assert skip_resp.json()["review_status"] == "skipped"
 
-        process_resp = auth_client.post(f"/api/ebay-import/process?batch_id={batch_id}", json={})
+        process_resp = client.post(f"/api/ebay-import/process?batch_id={batch_id}", json={})
         assert process_resp.json() == []
 
         with engine.connect() as conn:
             count = conn.execute(text("SELECT COUNT(*) FROM fungible_depletions")).scalar_one()
         assert count == 0
 
-    def test_match_endpoint_rejects_a_client_lying_about_serial_count(self, auth_client):
-        resp = auth_client.post(
+    def test_match_endpoint_rejects_a_client_lying_about_serial_count(self, client):
+        resp = client.post(
             "/api/purchases",
             json={
                 "purchase_date": "2026-09-08",
@@ -177,32 +170,32 @@ class TestReviewFlowThroughApi:
         sku = resp.json()["lines"][0]["sku"]
         serials = resp.json()["lines"][0]["serial_ids"]
 
-        upload_resp = _upload(auth_client, "aug.csv", [_order_row("11-00000-00001", "9000000001", "Rolex Submariner", qty=2)])
+        upload_resp = _upload(client, "aug.csv", [_order_row("11-00000-00001", "9000000001", "Rolex Submariner", qty=2)])
         batch_id = upload_resp.json()["batch_id"]
-        row_id = auth_client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]["id"]
+        row_id = client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]["id"]
 
         # Client claims only 1 serial even though the row needs 2.
-        resp = auth_client.post(f"/api/ebay-import/rows/{row_id}/match", json={"sku": sku, "serial_ids": [serials[0]]})
+        resp = client.post(f"/api/ebay-import/rows/{row_id}/match", json={"sku": sku, "serial_ids": [serials[0]]})
         assert resp.status_code == 400
         assert resp.json()["detail"]["error_type"] == "InvalidRowActionError"
 
-    def test_refund_rows_visible_but_not_actionable_through_the_api(self, auth_client):
+    def test_refund_rows_visible_but_not_actionable_through_the_api(self, client):
         refund_row = (
             '"Aug 16, 2026",Refund,11-00000-00099,11-00000-00099,b,B,City,ST,0,US,-10,USD,'
             "--,--,--,--,--,--,--,Refunded Widget,--,--,--,--,--,-1,0.4,2,--,--,--,0.2,--,--,-10,USD,--,Cancel,--"
         )
-        upload_resp = _upload(auth_client, "aug.csv", [refund_row])
+        upload_resp = _upload(client, "aug.csv", [refund_row])
         batch_id = upload_resp.json()["batch_id"]
-        rows = auth_client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()
+        rows = client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()
         assert len(rows) == 1
         assert rows[0]["row_type"] == "Refund"
 
-        skip_resp = auth_client.post(f"/api/ebay-import/rows/{rows[0]['id']}/skip")
+        skip_resp = client.post(f"/api/ebay-import/rows/{rows[0]['id']}/skip")
         assert skip_resp.status_code == 400
         assert skip_resp.json()["detail"]["error_type"] == "InvalidRowActionError"
 
-    def test_ebay_import_page_renders(self, auth_client):
-        resp = auth_client.get("/ebay-import")
+    def test_ebay_import_page_renders(self, client):
+        resp = client.get("/ebay-import")
         assert resp.status_code == 200
         assert "eBay Sales Import" in resp.text
         assert "ebay_import.js" in resp.text

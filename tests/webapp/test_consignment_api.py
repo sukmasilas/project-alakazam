@@ -8,22 +8,22 @@ from __future__ import annotations
 from sqlalchemy import text
 
 
-def _post_new_item(auth_client, name, identity_mode, category_code="OTHERS"):
-    resp = auth_client.post(
+def _post_new_item(client, name, identity_mode, category_code="OTHERS"):
+    resp = client.post(
         "/api/items", json={"name": name, "category_code": category_code, "identity_mode": identity_mode}
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["sku"]
 
 
-def _post_consignor(auth_client, name="API Test Consignor", contact_info="0812-0000-0000"):
-    resp = auth_client.post("/api/consignors", json={"name": name, "contact_info": contact_info})
+def _post_consignor(client, name="API Test Consignor", contact_info="0812-0000-0000"):
+    resp = client.post("/api/consignors", json={"name": name, "contact_info": contact_info})
     assert resp.status_code == 201, resp.text
     return resp.json()
 
 
-def _post_intake(auth_client, consignor_id, name="API Consigned Watch", category_code="WATCHES", quantity=1):
-    resp = auth_client.post(
+def _post_intake(client, consignor_id, name="API Consigned Watch", category_code="WATCHES", quantity=1):
+    resp = client.post(
         "/api/consignment/intake",
         json={
             "consignor_id": consignor_id,
@@ -36,23 +36,23 @@ def _post_intake(auth_client, consignor_id, name="API Consigned Watch", category
     return resp.json()
 
 
-def test_create_and_list_consignors(auth_client):
-    consignor = _post_consignor(auth_client, name="API Consignor One")
+def test_create_and_list_consignors(client):
+    consignor = _post_consignor(client, name="API Consignor One")
     assert consignor["name"] == "API Consignor One"
 
-    listed = auth_client.get("/api/consignors").json()
+    listed = client.get("/api/consignors").json()
     assert any(c["id"] == consignor["id"] for c in listed)
 
 
-def test_create_consignor_rejects_blank_name(auth_client):
-    resp = auth_client.post("/api/consignors", json={"name": "   "})
+def test_create_consignor_rejects_blank_name(client):
+    resp = client.post("/api/consignors", json={"name": "   "})
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "ValidationError"
 
 
-def test_intake_creates_consigned_item_through_real_engine(auth_client, engine):
-    consignor = _post_consignor(auth_client)
-    result = _post_intake(auth_client, consignor["id"], quantity=2)
+def test_intake_creates_consigned_item_through_real_engine(client, engine):
+    consignor = _post_consignor(client)
+    result = _post_intake(client, consignor["id"], quantity=2)
 
     assert result["sku"].startswith("CONSIGN-WATCH-")
     assert result["consignor_id"] == consignor["id"]
@@ -65,18 +65,18 @@ def test_intake_creates_consigned_item_through_real_engine(auth_client, engine):
     assert row["identity_mode"] == "serialized"
     assert row["consignor_id"] == consignor["id"]
 
-    detail = auth_client.get(f"/api/items/{result['sku']}").json()
+    detail = client.get(f"/api/items/{result['sku']}").json()
     assert detail["quantity"] == 2
     assert detail["cost_basis"] == "0"
     assert detail["consignor_id"] == consignor["id"]
     assert detail["consignor_name"] == consignor["name"]
 
 
-def test_intake_reuses_existing_consigned_item(auth_client):
-    consignor = _post_consignor(auth_client)
-    first = _post_intake(auth_client, consignor["id"], quantity=1)
+def test_intake_reuses_existing_consigned_item(client):
+    consignor = _post_consignor(client)
+    first = _post_intake(client, consignor["id"], quantity=1)
 
-    resp = auth_client.post(
+    resp = client.post(
         "/api/consignment/intake", json={"consignor_id": consignor["id"], "sku": first["sku"], "quantity": 1}
     )
     assert resp.status_code == 201, resp.text
@@ -85,8 +85,8 @@ def test_intake_reuses_existing_consigned_item(auth_client):
     assert not (set(first["serial_ids"]) & set(second["serial_ids"]))
 
 
-def test_intake_rejects_nonexistent_consignor(auth_client):
-    resp = auth_client.post(
+def test_intake_rejects_nonexistent_consignor(client):
+    resp = client.post(
         "/api/consignment/intake",
         json={"consignor_id": 999999, "new_item_name": "X", "new_item_category_code": "OTHERS", "quantity": 1},
     )
@@ -94,28 +94,28 @@ def test_intake_rejects_nonexistent_consignor(auth_client):
     assert resp.json()["detail"]["error_type"] == "ConsignorNotFoundError"
 
 
-def test_intake_rejects_reusing_a_plain_owned_item(auth_client):
-    consignor = _post_consignor(auth_client)
-    sku = _post_new_item(auth_client, "Plain Owned Serialized Item", "serialized", category_code="WATCHES")
-    resp = auth_client.post(
+def test_intake_rejects_reusing_a_plain_owned_item(client):
+    consignor = _post_consignor(client)
+    sku = _post_new_item(client, "Plain Owned Serialized Item", "serialized", category_code="WATCHES")
+    resp = client.post(
         "/api/consignment/intake", json={"consignor_id": consignor["id"], "sku": sku, "quantity": 1}
     )
     assert resp.status_code == 400
     assert resp.json()["detail"]["error_type"] == "ItemNotConsignedError"
 
 
-def test_mark_as_sold_on_consigned_unit_routes_to_consignment_engine(auth_client, engine):
+def test_mark_as_sold_on_consigned_unit_routes_to_consignment_engine(client, engine):
     """The SAME endpoint used for an ordinary item's Mark-as-Sold
     (/api/items/{sku}/serial-units/{serial_id}/deplete) must detect (via
     the item's consignor_id) that this is a consigned unit and route
     internally to inventory.consignment.sell_consigned_unit — one
     consistent entry point, not two different "sell" buttons/endpoints.
     """
-    consignor = _post_consignor(auth_client)
-    intake = _post_intake(auth_client, consignor["id"], quantity=1)
+    consignor = _post_consignor(client)
+    intake = _post_intake(client, consignor["id"], quantity=1)
     serial_id = intake["serial_ids"][0]
 
-    resp = auth_client.post(
+    resp = client.post(
         f"/api/items/{intake['sku']}/serial-units/{serial_id}/deplete",
         json={"reference": "eBay #777"},
     )
@@ -138,13 +138,13 @@ def test_mark_as_sold_on_consigned_unit_routes_to_consignment_engine(auth_client
     assert row["consignor_id"] == consignor["id"]
 
 
-def test_mark_as_sold_on_plain_owned_unit_still_uses_plain_depletion(auth_client):
+def test_mark_as_sold_on_plain_owned_unit_still_uses_plain_depletion(client):
     """The routing decision must not affect an ordinary, non-consigned
     serialized item — same endpoint, same plain depletion behavior as
     Milestone 5 shipped it.
     """
-    sku = _post_new_item(auth_client, "Plain Owned Watch For Sale", "serialized", category_code="WATCHES")
-    detail = auth_client.get(f"/api/items/{sku}").json()
+    sku = _post_new_item(client, "Plain Owned Watch For Sale", "serialized", category_code="WATCHES")
+    detail = client.get(f"/api/items/{sku}").json()
     assert detail["quantity"] == 0  # no purchase yet — nothing to sell, proves this is a genuinely plain item
 
     # Buy one unit for real, then sell it — must NOT create a reimbursement.
@@ -161,11 +161,11 @@ def test_mark_as_sold_on_plain_owned_unit_still_uses_plain_depletion(auth_client
             }
         ],
     }
-    purchase_resp = auth_client.post("/api/purchases", json=purchase_body)
+    purchase_resp = client.post("/api/purchases", json=purchase_body)
     assert purchase_resp.status_code == 201, purchase_resp.text
     serial_id = purchase_resp.json()["lines"][0]["serial_ids"][0]
 
-    resp = auth_client.post(
+    resp = client.post(
         f"/api/items/{sku}/serial-units/{serial_id}/deplete", json={"reference": "Plain sale"}
     )
     assert resp.status_code == 200, resp.text
@@ -174,35 +174,35 @@ def test_mark_as_sold_on_plain_owned_unit_still_uses_plain_depletion(auth_client
     assert "status" not in body or body.get("status") != "unpaid"
     assert "reimbursement_id" not in body
 
-    reimbursements = auth_client.get("/api/consignment/reimbursements").json()
+    reimbursements = client.get("/api/consignment/reimbursements").json()
     assert reimbursements == []
 
 
-def test_double_sell_of_consigned_unit_rejected(auth_client):
-    consignor = _post_consignor(auth_client)
-    intake = _post_intake(auth_client, consignor["id"], quantity=1)
+def test_double_sell_of_consigned_unit_rejected(client):
+    consignor = _post_consignor(client)
+    intake = _post_intake(client, consignor["id"], quantity=1)
     serial_id = intake["serial_ids"][0]
 
-    first = auth_client.post(f"/api/items/{intake['sku']}/serial-units/{serial_id}/deplete", json={})
+    first = client.post(f"/api/items/{intake['sku']}/serial-units/{serial_id}/deplete", json={})
     assert first.status_code == 200
 
-    second = auth_client.post(f"/api/items/{intake['sku']}/serial-units/{serial_id}/deplete", json={})
+    second = client.post(f"/api/items/{intake['sku']}/serial-units/{serial_id}/deplete", json={})
     assert second.status_code == 400
     assert second.json()["detail"]["error_type"] == "AlreadyDepletedError"
 
 
-def test_list_and_mark_paid_reimbursement_through_real_engine(auth_client, engine):
-    consignor = _post_consignor(auth_client)
-    intake = _post_intake(auth_client, consignor["id"], quantity=1)
+def test_list_and_mark_paid_reimbursement_through_real_engine(client, engine):
+    consignor = _post_consignor(client)
+    intake = _post_intake(client, consignor["id"], quantity=1)
     serial_id = intake["serial_ids"][0]
-    sale = auth_client.post(
+    sale = client.post(
         f"/api/items/{intake['sku']}/serial-units/{serial_id}/deplete", json={}
     ).json()
 
-    unpaid = auth_client.get("/api/consignment/reimbursements?status=unpaid").json()
+    unpaid = client.get("/api/consignment/reimbursements?status=unpaid").json()
     assert any(r["id"] == sale["reimbursement_id"] for r in unpaid)
 
-    resp = auth_client.post(
+    resp = client.post(
         f"/api/consignment/reimbursements/{sale['reimbursement_id']}/mark-paid",
         json={"payment_reference": "Paid via BCA transfer"},
     )
@@ -218,40 +218,40 @@ def test_list_and_mark_paid_reimbursement_through_real_engine(auth_client, engin
     assert row["status"] == "paid"
 
     # Double mark-paid must fail cleanly — no reopen/reverse flow.
-    resp2 = auth_client.post(f"/api/consignment/reimbursements/{sale['reimbursement_id']}/mark-paid", json={})
+    resp2 = client.post(f"/api/consignment/reimbursements/{sale['reimbursement_id']}/mark-paid", json={})
     assert resp2.status_code == 400
     assert resp2.json()["detail"]["error_type"] == "ReimbursementNotUnpaidError"
 
 
-def test_reimbursements_filter_by_consignor(auth_client):
-    consignor_a = _post_consignor(auth_client, name="Filter API Consignor A")
-    consignor_b = _post_consignor(auth_client, name="Filter API Consignor B")
-    intake_a = _post_intake(auth_client, consignor_a["id"], name="Filter API Item A")
-    intake_b = _post_intake(auth_client, consignor_b["id"], name="Filter API Item B")
-    auth_client.post(f"/api/items/{intake_a['sku']}/serial-units/{intake_a['serial_ids'][0]}/deplete", json={})
-    auth_client.post(f"/api/items/{intake_b['sku']}/serial-units/{intake_b['serial_ids'][0]}/deplete", json={})
+def test_reimbursements_filter_by_consignor(client):
+    consignor_a = _post_consignor(client, name="Filter API Consignor A")
+    consignor_b = _post_consignor(client, name="Filter API Consignor B")
+    intake_a = _post_intake(client, consignor_a["id"], name="Filter API Item A")
+    intake_b = _post_intake(client, consignor_b["id"], name="Filter API Item B")
+    client.post(f"/api/items/{intake_a['sku']}/serial-units/{intake_a['serial_ids'][0]}/deplete", json={})
+    client.post(f"/api/items/{intake_b['sku']}/serial-units/{intake_b['serial_ids'][0]}/deplete", json={})
 
-    only_a = auth_client.get(f"/api/consignment/reimbursements?consignor_id={consignor_a['id']}").json()
+    only_a = client.get(f"/api/consignment/reimbursements?consignor_id={consignor_a['id']}").json()
     assert len(only_a) == 1
     assert only_a[0]["consignor_id"] == consignor_a["id"]
 
 
-def test_consignors_page_renders(auth_client):
-    resp = auth_client.get("/consignors")
+def test_consignors_page_renders(client):
+    resp = client.get("/consignors")
     assert resp.status_code == 200
     assert "Consignors" in resp.text
     assert "consignors.js" in resp.text
 
 
-def test_consignment_intake_page_renders(auth_client):
-    resp = auth_client.get("/consignment/intake")
+def test_consignment_intake_page_renders(client):
+    resp = client.get("/consignment/intake")
     assert resp.status_code == 200
     assert "Consignment Intake" in resp.text
     assert "consignment_intake.js" in resp.text
 
 
-def test_consignor_reimbursements_page_renders(auth_client):
-    resp = auth_client.get("/consignment/reimbursements")
+def test_consignor_reimbursements_page_renders(client):
+    resp = client.get("/consignment/reimbursements")
     assert resp.status_code == 200
     assert "Consignor Reimbursements" in resp.text
     assert "consignor_reimbursements.js" in resp.text
