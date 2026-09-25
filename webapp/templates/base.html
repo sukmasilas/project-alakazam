@@ -3,7 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <title>Alakazam — {% block title %}Inventory{% endblock %}</title>
-<link rel="stylesheet" href="/static/css/app.css">
+<link rel="stylesheet" href="{{ root_path }}/static/css/app.css">
+{#
+  APP_ROOT_PATH is the single source of truth the frontend JS uses to know
+  its own reverse-proxy mount prefix (e.g. "/alakazam") — see common.js's
+  appUrl() helper, used by every fetch() call and every client-rendered
+  navigation link. Must be set before common.js runs. root_path itself
+  comes from request.scope["root_path"] (see webapp/app.py's
+  _root_path_context) — ASGI's native mechanism, set via
+  `uvicorn ... --root-path /alakazam` in production, empty string in local
+  dev (a strict no-op).
+#}
+<script>window.APP_ROOT_PATH = "{{ root_path }}";</script>
 {% block head %}{% endblock %}
 </head>
 <body>
@@ -11,15 +22,15 @@
 <div class="app">
   <div class="sidebar">
     <div class="brand">Alakazam<span>.</span><small>Inventory</small></div>
-    <a class="nav-item {% if active_nav == 'inventory' %}active{% endif %}" href="/inventory">Inventory</a>
-    <a class="nav-item {% if active_nav == 'purchase' %}active{% endif %}" href="/purchases/new">Purchase Entry</a>
-    <a class="nav-item {% if active_nav == 'history' %}active{% endif %}" href="/purchases">Purchase History</a>
-    <a class="nav-item {% if active_nav == 'sales' %}active{% endif %}" href="/sales">Sales / Depletion Log</a>
-    <a class="nav-item {% if active_nav == 'ebay_import' %}active{% endif %}" href="/ebay-import">eBay Sales Import</a>
-    <a class="nav-item {% if active_nav == 'preorders' %}active{% endif %}" href="/preorders">Pre-Order Sales</a>
-    <a class="nav-item {% if active_nav == 'consignors' %}active{% endif %}" href="/consignors">Consignors</a>
-    <a class="nav-item {% if active_nav == 'consignment_intake' %}active{% endif %}" href="/consignment/intake">Consignment Intake</a>
-    <a class="nav-item {% if active_nav == 'reimbursements' %}active{% endif %}" href="/consignment/reimbursements">Consignor Reimbursements</a>
+    <a class="nav-item {% if active_nav == 'inventory' %}active{% endif %}" href="{{ root_path }}/inventory">Inventory</a>
+    <a class="nav-item {% if active_nav == 'purchase' %}active{% endif %}" href="{{ root_path }}/purchases/new">Purchase Entry</a>
+    <a class="nav-item {% if active_nav == 'history' %}active{% endif %}" href="{{ root_path }}/purchases">Purchase History</a>
+    <a class="nav-item {% if active_nav == 'sales' %}active{% endif %}" href="{{ root_path }}/sales">Sales / Depletion Log</a>
+    <a class="nav-item {% if active_nav == 'ebay_import' %}active{% endif %}" href="{{ root_path }}/ebay-import">eBay Sales Import</a>
+    <a class="nav-item {% if active_nav == 'preorders' %}active{% endif %}" href="{{ root_path }}/preorders">Pre-Order Sales</a>
+    <a class="nav-item {% if active_nav == 'consignors' %}active{% endif %}" href="{{ root_path }}/consignors">Consignors</a>
+    <a class="nav-item {% if active_nav == 'consignment_intake' %}active{% endif %}" href="{{ root_path }}/consignment/intake">Consignment Intake</a>
+    <a class="nav-item {% if active_nav == 'reimbursements' %}active{% endif %}" href="{{ root_path }}/consignment/reimbursements">Consignor Reimbursements</a>
     <div class="nav-note">
       Milestone 8 — real backend, real Postgres data.
     </div>
@@ -34,8 +45,8 @@
     </div>
   </div>
 </div>
-<script src="/static/js/common.js"></script>
-<script src="/static/js/calc.js"></script>
+<script src="{{ root_path }}/static/js/common.js"></script>
+<script src="{{ root_path }}/static/js/calc.js"></script>
 {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -2,11 +2,11 @@
 {% block title %}Item Detail{% endblock %}
 {% block page_title %}Item Detail{% endblock %}
 {% block content %}
-<a class="back-link" href="/inventory">← Back to Inventory</a>
+<a class="back-link" href="{{ root_path }}/inventory">← Back to Inventory</a>
 <div class="detail-header" id="detail-header">Loading…</div>
 <div id="mark-sold-panel"></div>
 <div id="detail-body"></div>
 <div class="subtitle" style="margin-top:14px;"><a class="link-btn" id="sales-log-link" href="#">View this item's full Sales / Depletion Log →</a></div>
 <script>window.ITEM_SKU = {{ sku|tojson }};</script>
 {% endblock %}
-{% block scripts %}<script src="/static/js/item_detail.js"></script>{% endblock %}
+{% block scripts %}<script src="{{ root_path }}/static/js/item_detail.js"></script>{% endblock %}

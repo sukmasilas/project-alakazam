@@ -117,7 +117,7 @@ function renderPreorderList() {
           <td>${r.status === "pending" ? `<input type="checkbox" data-select="${r.id}" data-sku="${escapeAttr(r.sku)}" ${psSelectedIds.has(r.id) ? "checked" : ""}>` : ""}</td>
           <td>#${r.id}</td>
           <td>${r.sale_date}</td>
-          <td><a class="link-btn" href="/items/${encodeURIComponent(r.sku)}">${escapeAttr(r.sku)}</a><br><span class="num-inline">${escapeAttr(r.item_name)}</span></td>
+          <td><a class="link-btn" href="${appUrl("/items/" + encodeURIComponent(r.sku))}">${escapeAttr(r.sku)}</a><br><span class="num-inline">${escapeAttr(r.item_name)}</span></td>
           <td class="num">${Number(r.quantity).toLocaleString("id-ID")}</td>
           <td>${r.reference ? escapeAttr(r.reference) : `<span style="color:var(--text-dim);font-size:12px;">—</span>`}</td>
           <td>${statusBadge(r.status)}</td>

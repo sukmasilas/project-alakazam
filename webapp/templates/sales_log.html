@@ -8,4 +8,4 @@
 <div id="sales-list">Loading…</div>
 <script>window.SALES_FILTER_SKU = {{ filter_sku|tojson }};</script>
 {% endblock %}
-{% block scripts %}<script src="/static/js/sales_log.js"></script>{% endblock %}
+{% block scripts %}<script src="{{ root_path }}/static/js/sales_log.js"></script>{% endblock %}

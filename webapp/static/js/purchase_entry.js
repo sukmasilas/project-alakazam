@@ -802,7 +802,7 @@ async function savePurchase() {
     const saved = await apiPost("/api/purchases", payload);
     if (!saved) return;
     showToast(`Purchase ${saved.purchase_ref} saved — ${fmtIDR(saved.allocation.total_amount_paid)} across ${saved.lines.length} line(s).`);
-    window.location.href = "/purchases?ref=" + encodeURIComponent(saved.purchase_ref);
+    window.location.href = appUrl("/purchases?ref=" + encodeURIComponent(saved.purchase_ref));
   } catch (err) {
     errBox.style.display = "block";
     const type = (err.detail && err.detail.error_type) || "Error";

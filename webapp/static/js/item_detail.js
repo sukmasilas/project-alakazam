@@ -13,7 +13,7 @@ let lastItemData = null;
 
 async function loadItemDetail() {
   const sku = window.ITEM_SKU;
-  document.getElementById("sales-log-link").href = "/sales?sku=" + encodeURIComponent(sku);
+  document.getElementById("sales-log-link").href = appUrl("/sales?sku=" + encodeURIComponent(sku));
 
   let data;
   try {
@@ -47,7 +47,7 @@ async function loadItemDetail() {
         <thead><tr><th>Serial / Asset ID</th><th>Acquisition Date</th><th class="num">Allocated Cost</th><th>Source Purchase</th><th>Photo</th><th>Status</th></tr></thead>
         <tbody>${rows.map(u => `
           <tr><td><b>${escapeAttr(u.serial_id)}</b></td><td>${u.acquired_date}</td><td class="num">${fmtIDR(u.cost)}</td>
-          <td><a class="link-btn" href="/purchases?ref=${encodeURIComponent(u.purchase_ref)}">${escapeAttr(u.purchase_ref)}</a></td>
+          <td><a class="link-btn" href="${appUrl("/purchases?ref=" + encodeURIComponent(u.purchase_ref))}">${escapeAttr(u.purchase_ref)}</a></td>
           <td>${u.photo_reference ? escapeAttr(u.photo_reference) : `<span style="color:var(--text-dim);font-size:12px;">No photo</span>`}</td>
           <td>${renderSerialStatusCell(data.sku, u)}</td></tr>
         `).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px;">No units on hand.</td></tr>`}</tbody>
@@ -59,7 +59,7 @@ async function loadItemDetail() {
       <table>
         <thead><tr><th>Date</th><th>Purchase Reference</th><th class="num">Qty</th><th class="num">Allocated Unit Cost</th><th class="num">Line Total</th></tr></thead>
         <tbody>${rows.map(r => `
-          <tr><td>${r.purchase_date}</td><td><a class="link-btn" href="/purchases?ref=${encodeURIComponent(r.purchase_ref)}">${escapeAttr(r.purchase_ref)}</a></td>
+          <tr><td>${r.purchase_date}</td><td><a class="link-btn" href="${appUrl("/purchases?ref=" + encodeURIComponent(r.purchase_ref))}">${escapeAttr(r.purchase_ref)}</a></td>
           <td class="num">${Number(r.quantity).toLocaleString("id-ID")}</td><td class="num">${fmtIDR(r.allocated_unit_cost)}</td><td class="num">${fmtIDR(r.line_total)}</td></tr>
         `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px;">No purchase history yet.</td></tr>`}</tbody>
       </table>`;

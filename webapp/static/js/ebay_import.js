@@ -58,8 +58,7 @@ async function uploadFile() {
   formData.append("file", file);
   resultBox.innerHTML = `<div class="subtitle">Uploading and parsing…</div>`;
   try {
-    const res = await fetch("/api/ebay-import/upload", { method: "POST", credentials: "same-origin", body: formData });
-    if (res.status === 401) { window.location.href = "/login"; return; }
+    const res = await fetch(appUrl("/api/ebay-import/upload"), { method: "POST", credentials: "same-origin", body: formData });
     if (!res.ok) {
       const body = await res.json().catch(() => null);
       const msg = (body && body.detail && body.detail.message) || `Upload failed (${res.status})`;

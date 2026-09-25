@@ -12,8 +12,14 @@ from starlette.templating import Jinja2Templates
 
 def register_page_routes(app, templates: Jinja2Templates) -> None:
     @app.get("/")
-    async def index():
-        return RedirectResponse(url="/inventory", status_code=303)
+    async def index(request: Request):
+        # RedirectResponse does not auto-prefix its Location header with
+        # root_path (verified against Starlette's implementation) — it must
+        # be built manually so this redirect still lands on "/inventory"
+        # (not "/alakazam/inventory") when unprefixed, and correctly on
+        # "/alakazam/inventory" when mounted behind the reverse proxy.
+        root_path = request.scope.get("root_path", "") or ""
+        return RedirectResponse(url=f"{root_path}/inventory", status_code=303)
 
     @app.get("/inventory")
     async def inventory_page(request: Request):

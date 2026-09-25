@@ -46,7 +46,7 @@ async function loadReimbursements() {
         <tr>
           <td>#${r.id}</td>
           <td>${escapeAttr(r.consignor_name)}</td>
-          <td><a class="link-btn" href="/items/${encodeURIComponent(r.sku)}">${escapeAttr(r.sku)}</a><br><span class="num-inline">${escapeAttr(r.item_name)}</span></td>
+          <td><a class="link-btn" href="${appUrl("/items/" + encodeURIComponent(r.sku))}">${escapeAttr(r.sku)}</a><br><span class="num-inline">${escapeAttr(r.item_name)}</span></td>
           <td>${escapeAttr(r.serial_id)}</td>
           <td>${r.reference ? escapeAttr(r.reference) : `<span style="color:var(--text-dim);font-size:12px;">—</span>`}</td>
           <td>${statusBadge(r.status)}</td>

@@ -10,7 +10,7 @@ async function loadSalesLog() {
   const noteEl = document.getElementById("sales-filter-note");
   if (sku) {
     noteEl.style.display = "block";
-    noteEl.innerHTML = `Showing only <b>${escapeAttr(sku)}</b> — <a class="link-btn" href="/sales">clear filter</a>`;
+    noteEl.innerHTML = `Showing only <b>${escapeAttr(sku)}</b> — <a class="link-btn" href="${appUrl("/sales")}">clear filter</a>`;
   }
 
   const params = new URLSearchParams();
@@ -41,7 +41,7 @@ function renderSalesLog(rows) {
       <tbody>${rows.map(r => `
         <tr>
           <td>${r.depletion_date}</td>
-          <td><a class="link-btn" href="/items/${encodeURIComponent(r.sku)}">${escapeAttr(r.sku)}</a><br><span class="num-inline">${escapeAttr(r.item_name)}</span></td>
+          <td><a class="link-btn" href="${appUrl("/items/" + encodeURIComponent(r.sku))}">${escapeAttr(r.sku)}</a><br><span class="num-inline">${escapeAttr(r.item_name)}</span></td>
           <td>${depletionTypeLabel(r)}</td>
           <td class="num">${Number(r.quantity).toLocaleString("id-ID")}</td>
           <td class="num">${fmtIDR(r.unit_cost)}</td>

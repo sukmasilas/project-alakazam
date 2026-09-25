@@ -80,7 +80,7 @@ async function renderInventoryTable() {
       <td class="num">${fmtIDR(it.cost_basis)}</td>
     </tr>`).join("");
   tbody.querySelectorAll("tr[data-sku]").forEach(row => {
-    row.onclick = () => { window.location.href = "/items/" + encodeURIComponent(row.dataset.sku); };
+    row.onclick = () => { window.location.href = appUrl("/items/" + encodeURIComponent(row.dataset.sku)); };
   });
 }
 

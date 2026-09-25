@@ -35,20 +35,32 @@ function showToast(msg) {
   window.__toastTimer = setTimeout(() => { t.style.display = "none"; }, 3200);
 }
 
+/* Single shared mechanism the whole frontend uses to discover its own
+ * reverse-proxy mount prefix (e.g. "/alakazam" in production, "" in local
+ * dev — a strict no-op). window.APP_ROOT_PATH is set server-side in
+ * base.html from request.scope["root_path"] (ASGI's native mechanism —
+ * see webapp/app.py). Every app-relative absolute path — API calls in
+ * apiGet/apiPost below, and any client-rendered navigation link/redirect
+ * elsewhere in this codebase — must be routed through appUrl() rather than
+ * used as a bare "/..." string, or it will silently bypass the prefix and
+ * 404 once mounted behind nginx at /alakazam.
+ */
+function appUrl(path) {
+  return (window.APP_ROOT_PATH || "") + path;
+}
+
 async function apiGet(path) {
-  const res = await fetch(path, { credentials: "same-origin" });
-  if (res.status === 401) { window.location.href = "/login"; return null; }
+  const res = await fetch(appUrl(path), { credentials: "same-origin" });
   if (!res.ok) throw await _apiError(res);
   return res.json();
 }
 async function apiPost(path, body) {
-  const res = await fetch(path, {
+  const res = await fetch(appUrl(path), {
     method: "POST",
     credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (res.status === 401) { window.location.href = "/login"; return null; }
   if (!res.ok) throw await _apiError(res);
   return res.json();
 }

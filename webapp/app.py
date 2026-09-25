@@ -35,7 +35,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
@@ -46,6 +46,21 @@ from webapp.pages import register_page_routes
 from webapp import api as api_module
 
 BASE_DIR = Path(__file__).resolve().parent
+
+
+def _root_path_context(request: Request) -> dict:
+    """Makes the reverse-proxy mount prefix (e.g. "/alakazam") available to
+    every template as ``root_path``, so server-rendered links/redirects and
+    the JS-facing base-path global (see base.html) come out correctly
+    prefixed when this process is run with ``--root-path /alakazam`` behind
+    nginx, and are an exact no-op (empty string) in local/unprefixed dev.
+
+    ``root_path`` is ASGI's native mechanism for this (see uvicorn's
+    ``--root-path`` flag) — it only affects URL *generation*, never incoming
+    route matching, which is why this is safe to read directly off
+    ``request.scope`` rather than needing any routing changes.
+    """
+    return {"root_path": request.scope.get("root_path", "") or ""}
 
 
 def create_app(database_url: Optional[str] = None) -> FastAPI:
@@ -60,7 +75,10 @@ def create_app(database_url: Optional[str] = None) -> FastAPI:
     app = FastAPI(title="Alakazam", description="Inventory management (Milestone 3)", lifespan=lifespan)
     app.state.engine = get_engine(resolved_db_url)
 
-    templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+    templates = Jinja2Templates(
+        directory=str(BASE_DIR / "templates"),
+        context_processors=[_root_path_context],
+    )
     app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
 
     register_health_route(app)
