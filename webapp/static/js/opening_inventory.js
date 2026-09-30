@@ -16,6 +16,7 @@
  */
 
 let categoriesCache = [];
+let locationsCache = [];
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
@@ -28,7 +29,7 @@ function emptyDraft() {
     vendor: "",
     itemMode: "existing", // 'existing' | 'new'
     existingSku: "", existingIdentity: "fungible",
-    newItem: { code: "", name: "", category: "", identity: "fungible", skuTouched: false },
+    newItem: { code: "", name: "", category: "", identity: "fungible", skuTouched: false, locationId: "" },
     qty: 1,
     priceEntryMode: "per_unit", priceValue: 0,
     serialUnits: [], // [{serial, cost, costTouched}]
@@ -44,7 +45,11 @@ function currentSku() {
 }
 
 async function initOpeningInventoryPage() {
-  categoriesCache = (await apiGet("/api/categories")) || [];
+  [categoriesCache, locationsCache] = await Promise.all([
+    apiGet("/api/categories"), apiGet("/api/locations"),
+  ]);
+  categoriesCache = categoriesCache || [];
+  locationsCache = locationsCache || [];
   draft = emptyDraft();
 
   document.getElementById("oi-date").value = draft.date;
@@ -142,6 +147,12 @@ function renderNewItemForm() {
       <input type="text" id="oi-ns-code" value="${escapeAttr(ns.code || "")}" placeholder="Auto-generated as you type the name">
       <div class="sku-check" id="oi-ns-code-check"></div>
     </div>
+    <div class="nsfield"><label>Location (optional)</label>
+      <select id="oi-ns-location">
+        <option value="">— None —</option>
+        ${locationsCache.map(loc => `<option value="${loc.id}" ${String(ns.locationId) === String(loc.id) ? "selected" : ""}>${escapeAttr(loc.name)}</option>`).join("")}
+      </select>
+    </div>
   </div>`;
   document.getElementById("oi-new-item-form").innerHTML = html;
   wireNewItemFormEvents();
@@ -174,6 +185,7 @@ function wireNewItemFormEvents() {
   const idEl = document.getElementById("oi-ns-identity");
   const codeEl = document.getElementById("oi-ns-code");
   const regenBtn = document.getElementById("oi-ns-regen");
+  const locationEl = document.getElementById("oi-ns-location");
 
   nameEl.oninput = async () => {
     draft.newItem.name = nameEl.value;
@@ -202,6 +214,7 @@ function wireNewItemFormEvents() {
     codeEl.value = draft.newItem.code;
     await refreshNewSkuCheck();
   };
+  if (locationEl) locationEl.onchange = () => { draft.newItem.locationId = locationEl.value; };
 }
 
 /* ---- Price entry mode toggle (per-unit <-> total — genuinely converts the
@@ -408,6 +421,7 @@ function buildPayload() {
       category_code: draft.newItem.category,
       identity_mode: draft.newItem.identity,
       sku: draft.newItem.code || null,
+      location_id: draft.newItem.locationId ? parseInt(draft.newItem.locationId, 10) : null,
     };
   }
   if (currentIdentity() === "serialized") {
@@ -437,7 +451,7 @@ async function submitEntry() {
     // sitting usually keeps both the same.
     draft.itemMode = "existing";
     draft.existingSku = ""; draft.existingIdentity = "fungible";
-    draft.newItem = { code: "", name: "", category: (categoriesCache[0] || {}).code || "", identity: "fungible", skuTouched: false };
+    draft.newItem = { code: "", name: "", category: (categoriesCache[0] || {}).code || "", identity: "fungible", skuTouched: false, locationId: "" };
     draft.qty = 1; draft.priceEntryMode = "per_unit"; draft.priceValue = 0;
     draft.serialUnits = []; draft.serialPanelOpen = false;
 

@@ -55,6 +55,7 @@ from inventory.exceptions import (
     ReconciliationError,
     ValidationError,
 )
+from inventory.locations import validate_location_id
 from inventory.queries import (
     count_serial_units_for_item,
     get_category_by_code,
@@ -78,6 +79,11 @@ class NewItemInput:
     category_code: str
     identity_mode: str  # 'fungible' | 'serialized'
     sku: Optional[str] = None  # None => auto-generate
+    # Shelving/location feature, confirmed 2026-10-01 — optional, defaults
+    # to None so every pre-existing caller (Purchase Entry, and Opening
+    # Inventory via inventory/opening_inventory.py, which reuses this exact
+    # dataclass unmodified) is unaffected. See inventory/locations.py.
+    location_id: Optional[int] = None
 
 
 @dataclass
@@ -283,6 +289,12 @@ def save_purchase(conn: Connection, purchase: PurchaseInput) -> SavedPurchase:
                 raise ValidationError(
                     f"Line {i}: unknown category_code {line.new_item.category_code!r}."
                 )
+            # Validated up front, before any row is written — same reasoning
+            # as inventory/locations.py::validate_location_id's own
+            # docstring: a bad location_id must surface as a plain
+            # ValidationError here, never be mis-caught as a DuplicateSkuError
+            # by the savepoint's except block further below.
+            validate_location_id(conn, line.new_item.location_id)
             sku = _resolve_new_item_sku(
                 conn, category.sku_prefix, line.new_item.name, line.new_item.sku, resolved_new_skus
             )
@@ -294,6 +306,7 @@ def save_purchase(conn: Connection, purchase: PurchaseInput) -> SavedPurchase:
                     "name": line.new_item.name,
                     "category_id": category.id,
                     "identity_mode": line.new_item.identity_mode,
+                    "location_id": line.new_item.location_id,
                 }
             )
 
@@ -356,14 +369,15 @@ def save_purchase(conn: Connection, purchase: PurchaseInput) -> SavedPurchase:
             with conn.begin_nested():
                 item_id = conn.execute(
                     text(
-                        "INSERT INTO items (sku, name, category_id, identity_mode) "
-                        "VALUES (:sku, :name, :category_id, :identity_mode) RETURNING id"
+                        "INSERT INTO items (sku, name, category_id, identity_mode, location_id) "
+                        "VALUES (:sku, :name, :category_id, :identity_mode, :location_id) RETURNING id"
                     ),
                     {
                         "sku": plan["sku"],
                         "name": plan["name"],
                         "category_id": plan["category_id"],
                         "identity_mode": plan["identity_mode"],
+                        "location_id": plan["location_id"],
                     },
                 ).scalar_one()
         except IntegrityError as exc:

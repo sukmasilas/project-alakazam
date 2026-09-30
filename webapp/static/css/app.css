@@ -166,7 +166,7 @@ tr.clickable:hover { background: #faf8ff; cursor: pointer; }
 .line-outputs { display: flex; gap: 22px; margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--border); font-size: 12.5px; flex-wrap: wrap; }
 .line-outputs .out b { display:block; font-size:14px; }
 .sku-check { font-size: 11.5px; margin-top: 4px; font-weight: 700; }
-.new-sku-box { margin-top: 10px; padding: 12px; background: #faf8ff; border: 1px dashed #d9cfff; border-radius: 6px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1.3fr; gap: 10px; }
+.new-sku-box { margin-top: 10px; padding: 12px; background: #faf8ff; border: 1px dashed #d9cfff; border-radius: 6px; display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .new-sku-box .nsfield label { display:block; font-size:10.5px; color:var(--text-dim); text-transform:uppercase; font-weight:700; margin-bottom:4px; }
 .new-sku-box .nsfield input, .new-sku-box .nsfield select { width: 100%; }
 

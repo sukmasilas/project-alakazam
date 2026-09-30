@@ -33,6 +33,12 @@ async function loadCategoryOptions() {
     categoriesCache.map(c => `<option value="${c.code}">${escapeAttr(c.name)}</option>`).join("");
 }
 
+async function loadLocationOptions() {
+  const locations = (await apiGet("/api/locations")) || [];
+  document.getElementById("ci-new-location").innerHTML =
+    `<option value="">— None —</option>` + locations.map(l => `<option value="${l.id}">${escapeAttr(l.name)}</option>`).join("");
+}
+
 function wireItemModeToggle() {
   document.querySelectorAll('input[name="ci-item-mode"]').forEach(radio => {
     radio.onchange = () => {
@@ -101,11 +107,13 @@ async function submitIntake() {
     const name = document.getElementById("ci-new-name").value.trim();
     const category = document.getElementById("ci-new-category").value;
     const skuOverride = document.getElementById("ci-new-sku").value.trim();
+    const locationValue = document.getElementById("ci-new-location").value;
     if (!name) { errorEl.textContent = "Enter an item name."; return; }
     if (!category) { errorEl.textContent = "Select a category."; return; }
     body.new_item_name = name;
     body.new_item_category_code = category;
     body.new_item_sku = skuOverride || null;
+    body.new_item_location_id = locationValue ? parseInt(locationValue, 10) : null;
   } else {
     if (!ciSelectedExistingSku) { errorEl.textContent = "Pick an existing consigned item from the dropdown."; return; }
     body.sku = ciSelectedExistingSku.sku;
@@ -120,6 +128,7 @@ async function submitIntake() {
     document.getElementById("ci-serials").value = "";
     document.getElementById("ci-new-name").value = "";
     document.getElementById("ci-new-sku").value = "";
+    document.getElementById("ci-new-location").value = "";
   } catch (err) {
     errorEl.textContent = err.message;
   }
@@ -132,3 +141,4 @@ wireExistingItemCombobox();
 document.getElementById("ci-submit").onclick = submitIntake;
 loadConsignorOptions();
 loadCategoryOptions();
+loadLocationOptions();

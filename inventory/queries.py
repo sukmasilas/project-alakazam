@@ -60,6 +60,10 @@ class Item:
     # which never sets this) is entirely unaffected. Non-None only for a
     # consigned item — see inventory/consignment.py.
     consignor_id: Optional[int] = None
+    # Shelving/location feature, confirmed 2026-10-01 — same "optional,
+    # defaults to None, unaffected pre-existing callers" pattern as
+    # consignor_id above. See inventory/locations.py.
+    location_id: Optional[int] = None
 
 
 def get_category_by_code(conn: Connection, code: str) -> Optional[Category]:
@@ -73,7 +77,7 @@ def get_category_by_code(conn: Connection, code: str) -> Optional[Category]:
 def get_item_by_sku(conn: Connection, sku: str) -> Optional[Item]:
     row = conn.execute(
         text(
-            "SELECT id, sku, name, category_id, identity_mode, consignor_id FROM items "
+            "SELECT id, sku, name, category_id, identity_mode, consignor_id, location_id FROM items "
             "WHERE UPPER(sku) = UPPER(:sku)"
         ),
         {"sku": sku},

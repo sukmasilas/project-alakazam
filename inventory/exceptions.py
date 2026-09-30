@@ -324,6 +324,17 @@ class ReimbursementNotUnpaidError(AlakazamError):
         super().__init__(message)
 
 
+class DuplicateLocationNameError(AlakazamError):
+    """Raised when a candidate location name already exists (shelving/
+    location feature, confirmed 2026-10-01: ``locations.name`` is UNIQUE at
+    the database level — see migrations/007_add_locations.sql).
+    """
+
+    def __init__(self, name: str):
+        self.name = name
+        super().__init__(f"Location {name!r} already exists.")
+
+
 class ReimbursementAlreadyExistsError(AlakazamError):
     """Defensive safety net: raised if a consignor reimbursement is ever
     posted for a serial unit that already has one (Milestone 8's real

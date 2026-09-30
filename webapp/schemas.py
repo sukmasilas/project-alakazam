@@ -22,6 +22,9 @@ class NewItemIn(BaseModel):
     category_code: str
     identity_mode: str
     sku: Optional[str] = None
+    # Shelving/location feature, confirmed 2026-10-01 — optional, defaults
+    # to None. See inventory/locations.py.
+    location_id: Optional[int] = None
 
 
 class SerialUnitIn(BaseModel):
@@ -83,6 +86,7 @@ def to_purchase_input(body: PurchaseIn) -> purchases_engine.PurchaseInput:
                 category_code=line.new_item.category_code,
                 identity_mode=line.new_item.identity_mode,
                 sku=line.new_item.sku,
+                location_id=line.new_item.location_id,
             )
         serial_units = None
         if line.serial_units is not None:
@@ -133,6 +137,9 @@ class NewItemCreateIn(BaseModel):
     category_code: str
     identity_mode: str
     sku: Optional[str] = None
+    # Shelving/location feature, confirmed 2026-10-01 — optional, defaults
+    # to None. See inventory/locations.py.
+    location_id: Optional[int] = None
 
 
 # --------------------------------------------------------------------- #
@@ -205,6 +212,9 @@ class ConsignmentIntakeIn(BaseModel):
     new_item_name: Optional[str] = None
     new_item_category_code: Optional[str] = None
     new_item_sku: Optional[str] = None
+    # Shelving/location feature, confirmed 2026-10-01 — optional, only
+    # meaningful when new_item_name is given. See inventory/locations.py.
+    new_item_location_id: Optional[int] = None
 
     quantity: int = 1
     serial_ids: Optional[list[str]] = None
@@ -258,6 +268,7 @@ def to_opening_inventory_input(body: OpeningInventoryIn):
             category_code=body.new_item.category_code,
             identity_mode=body.new_item.identity_mode,
             sku=body.new_item.sku,
+            location_id=body.new_item.location_id,
         )
     serial_units = None
     if body.serial_units is not None:
@@ -278,3 +289,17 @@ def to_opening_inventory_input(body: OpeningInventoryIn):
         vendor_description=body.vendor_description,
         serial_units=serial_units,
     )
+
+
+# --------------------------------------------------------------------- #
+# Shelving/location feature, confirmed 2026-10-01. See inventory/locations.py.
+# --------------------------------------------------------------------- #
+
+
+class LocationCreateIn(BaseModel):
+    name: str
+
+
+class ItemLocationUpdateIn(BaseModel):
+    # None clears the item's location back to unset — never required.
+    location_id: Optional[int] = None

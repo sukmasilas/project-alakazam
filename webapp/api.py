@@ -25,6 +25,7 @@ from ingestion.ebay_csv import EbayCsvFormatError
 from inventory import consignment as consignment_engine
 from inventory import depletions as depletions_engine
 from inventory import items as items_engine
+from inventory import locations as locations_engine
 from inventory import opening_inventory as opening_inventory_engine
 from inventory import preorders as preorders_engine
 from inventory import purchases as purchases_engine
@@ -39,6 +40,8 @@ from webapp.schemas import (
     ConsignorCreateIn,
     EbayRowMatchIn,
     FungibleDepletionIn,
+    ItemLocationUpdateIn,
+    LocationCreateIn,
     NewItemCreateIn,
     OpeningInventoryIn,
     PreorderFulfillIn,
@@ -154,6 +157,11 @@ def api_item_detail(sku: str, conn: Connection = Depends(get_read_conn)):
         consignor = consignment_engine.get_consignor(conn, item.consignor_id)
         consignor_name = consignor.name if consignor else None
 
+    location_name = None
+    if item.location_id is not None:
+        location = locations_engine.get_location(conn, item.location_id)
+        location_name = location.name if location else None
+
     payload = {
         "sku": item.sku,
         "name": item.name,
@@ -166,6 +174,11 @@ def api_item_detail(sku: str, conn: Connection = Depends(get_read_conn)):
         # every pre-existing caller/test of this endpoint is unaffected.
         "consignor_id": item.consignor_id,
         "consignor_name": consignor_name,
+        # Shelving/location feature, confirmed 2026-10-01 — None for every
+        # item with no location set (nullable, never required), so every
+        # pre-existing caller/test of this endpoint is unaffected.
+        "location_id": item.location_id,
+        "location_name": location_name,
     }
     if item.identity_mode == "serialized":
         payload["serialized_units"] = queries.get_serialized_unit_rows(conn, item.id)
@@ -179,10 +192,24 @@ def api_create_item(body: NewItemCreateIn, conn: Connection = Depends(get_write_
     try:
         item = items_engine.create_item(
             conn, name=body.name, category_code=body.category_code,
-            identity_mode=body.identity_mode, sku=body.sku,
+            identity_mode=body.identity_mode, sku=body.sku, location_id=body.location_id,
         )
     except AlakazamError as exc:
         raise _error_response(exc) from exc
+    return serialize(item)
+
+
+@router.post("/items/{sku}/location")
+def api_set_item_location(sku: str, body: ItemLocationUpdateIn, conn: Connection = Depends(get_write_conn)):
+    """Item Detail's "change location" action — the "editable afterward"
+    half of the shelving/location feature (confirmed 2026-10-01). See
+    inventory/locations.py::set_item_location.
+    """
+    try:
+        locations_engine.set_item_location(conn, sku=sku, location_id=body.location_id)
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    item = queries.get_item_by_sku(conn, sku)
     return serialize(item)
 
 
@@ -378,6 +405,7 @@ def api_consignment_intake(body: ConsignmentIntakeIn, conn: Connection = Depends
         new_item_name=body.new_item_name,
         new_item_category_code=body.new_item_category_code,
         new_item_sku=body.new_item_sku,
+        new_item_location_id=body.new_item_location_id,
         quantity=body.quantity,
         serial_ids=body.serial_ids,
         photo_references=body.photo_references,
@@ -415,6 +443,27 @@ def api_mark_reimbursement_paid(
 @router.get("/depletions")
 def api_list_depletions(sku: Optional[str] = None, conn: Connection = Depends(get_read_conn)):
     return serialize(queries.list_depletions(conn, sku=sku))
+
+
+# --------------------------------------------------------------------- #
+# Shelving/location tracking, confirmed 2026-10-01. Every endpoint here
+# calls straight into inventory.locations — same discipline as every prior
+# milestone's own simple-CRUD screen (see Consignors above).
+# --------------------------------------------------------------------- #
+
+
+@router.get("/locations")
+def api_list_locations(conn: Connection = Depends(get_read_conn)):
+    return serialize(locations_engine.list_locations(conn))
+
+
+@router.post("/locations", status_code=201)
+def api_create_location(body: LocationCreateIn, conn: Connection = Depends(get_write_conn)):
+    try:
+        result = locations_engine.create_location(conn, name=body.name)
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(result)
 
 
 # --------------------------------------------------------------------- #

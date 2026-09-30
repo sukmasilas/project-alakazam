@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Locations{% endblock %}
+{% block page_title %}Locations{% endblock %}
+{% block content %}
+<h1>Locations</h1>
+<div class="subtitle">Where items are physically stored (a shelf, bin, or room label). One location per item — set inline when a new item is created, or changed later from Item Detail. Deliberately simple — create + list, no deletion for v1.</div>
+
+<div class="control-box">
+  <div class="control-box-title">Add a new location</div>
+  <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+    <div class="lfield" style="flex:1;min-width:200px;"><label style="display:block;font-size:12px;margin-bottom:4px;">Name</label><input type="text" id="l-name" placeholder="e.g. Shelf A-3"></div>
+    <button class="btn btn-primary btn-sm" id="l-submit">Add Location</button>
+  </div>
+  <div id="l-create-error" style="margin-top:8px;color:var(--red-text);font-size:12.5px;"></div>
+</div>
+
+<div id="l-list">Loading…</div>
+{% endblock %}
+{% block scripts %}<script src="{{ root_path }}/static/js/locations.js"></script>{% endblock %}

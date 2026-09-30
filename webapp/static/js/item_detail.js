@@ -10,6 +10,7 @@
  */
 
 let lastItemData = null;
+let locationsCache = [];
 
 async function loadItemDetail() {
   const sku = window.ITEM_SKU;
@@ -24,6 +25,7 @@ async function loadItemDetail() {
   }
   if (!data) return;
   lastItemData = data;
+  locationsCache = (await apiGet("/api/locations")) || [];
 
   const consignorTag = data.consignor_id
     ? ` &middot; <span class="badge badge-amber">Consigned — ${escapeAttr(data.consignor_name || ("consignor #" + data.consignor_id))}</span>`
@@ -37,6 +39,7 @@ async function loadItemDetail() {
     <div class="detail-stat"><div class="label">Total Cost Basis</div><div class="value">${fmtIDR(data.cost_basis)}</div></div>
   `;
 
+  renderLocationPanel(data);
   renderMarkSoldPanel(data);
 
   const body = document.getElementById("detail-body");
@@ -63,6 +66,47 @@ async function loadItemDetail() {
           <td class="num">${Number(r.quantity).toLocaleString("id-ID")}</td><td class="num">${fmtIDR(r.allocated_unit_cost)}</td><td class="num">${fmtIDR(r.line_total)}</td></tr>
         `).join("") || `<tr><td colspan="5" style="text-align:center;color:var(--text-dim);padding:20px;">No purchase history yet.</td></tr>`}</tbody>
       </table>`;
+  }
+}
+
+/* ---- Location — viewable + editable, shelving/location feature confirmed
+ * 2026-10-01. Change posts to /api/items/{sku}/location, which calls the
+ * real inventory.locations.set_item_location() — the server is always
+ * authoritative (a client-supplied location_id is never trusted beyond
+ * what that real engine actually accepts). ---- */
+
+function renderLocationPanel(data) {
+  const panel = document.getElementById("location-panel");
+  const currentLabel = data.location_name ? escapeAttr(data.location_name) : `<span style="color:var(--text-dim);">No location set</span>`;
+  panel.innerHTML = `
+    <div class="control-box">
+      <div class="control-box-title">Location</div>
+      <div style="display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap;">
+        <div class="lfield" style="min-width:200px;"><label style="display:block;font-size:12px;margin-bottom:4px;">Current: ${currentLabel}</label>
+          <select id="loc-select">
+            <option value="">— None —</option>
+            ${locationsCache.map(l => `<option value="${l.id}" ${data.location_id === l.id ? "selected" : ""}>${escapeAttr(l.name)}</option>`).join("")}
+          </select>
+        </div>
+        <button class="btn btn-sm" id="loc-submit">Change Location</button>
+      </div>
+      <div class="mark-sold-error" id="loc-error"></div>
+    </div>
+  `;
+  document.getElementById("loc-submit").onclick = () => submitLocationChange(data.sku);
+}
+
+async function submitLocationChange(sku) {
+  const select = document.getElementById("loc-select");
+  const errorEl = document.getElementById("loc-error");
+  errorEl.textContent = "";
+  const locationId = select.value ? parseInt(select.value, 10) : null;
+  try {
+    await apiPost(`/api/items/${encodeURIComponent(sku)}/location`, { location_id: locationId });
+    showToast("Location updated.");
+    await loadItemDetail();
+  } catch (err) {
+    errorEl.textContent = err.message;
   }
 }
 

@@ -74,6 +74,7 @@ from inventory.exceptions import (
     ReimbursementNotUnpaidError,
     ValidationError,
 )
+from inventory.locations import validate_location_id
 from inventory.queries import (
     count_serial_units_for_item,
     get_category_by_code,
@@ -141,6 +142,11 @@ class ConsignmentIntakeInput:
     new_item_name: Optional[str] = None  # OR create a brand-new consigned item
     new_item_category_code: Optional[str] = None  # required if new_item_name is given
     new_item_sku: Optional[str] = None  # optional explicit SKU override for a new item
+    # Shelving/location feature, confirmed 2026-10-01 — optional, only
+    # meaningful when new_item_name is given (a reused existing consigned
+    # item already has its own location, editable via Item Detail instead).
+    # See inventory/locations.py.
+    new_item_location_id: Optional[int] = None
 
     quantity: int = 1
     # Optional explicit serial IDs (length must == quantity if given) / photo
@@ -196,6 +202,13 @@ def intake_consigned_units(conn: Connection, intake: ConsignmentIntakeInput) -> 
         if category is None:
             raise ValidationError(f"Unknown category_code: {intake.new_item_category_code!r}")
 
+        # Validated up front, before any row is written — same reasoning as
+        # inventory/locations.py::validate_location_id's own docstring: a
+        # bad location_id must surface as a plain ValidationError, never be
+        # mis-caught as a DuplicateSkuError by the savepoint's except block
+        # further below.
+        validate_location_id(conn, intake.new_item_location_id)
+
         consign_prefix = f"{CONSIGN_SKU_PREFIX_TAG}-{category.sku_prefix}"
         if intake.new_item_sku and intake.new_item_sku.strip():
             sku = intake.new_item_sku.strip().upper()
@@ -216,14 +229,15 @@ def intake_consigned_units(conn: Connection, intake: ConsignmentIntakeInput) -> 
             with conn.begin_nested():
                 item_id = conn.execute(
                     text(
-                        "INSERT INTO items (sku, name, category_id, identity_mode, consignor_id) "
-                        "VALUES (:sku, :name, :category_id, 'serialized', :consignor_id) RETURNING id"
+                        "INSERT INTO items (sku, name, category_id, identity_mode, consignor_id, location_id) "
+                        "VALUES (:sku, :name, :category_id, 'serialized', :consignor_id, :location_id) RETURNING id"
                     ),
                     {
                         "sku": sku,
                         "name": name,
                         "category_id": category.id,
                         "consignor_id": intake.consignor_id,
+                        "location_id": intake.new_item_location_id,
                     },
                 ).scalar_one()
         except IntegrityError as exc:

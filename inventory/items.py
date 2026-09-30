@@ -25,6 +25,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.exc import IntegrityError
 
 from inventory.exceptions import DuplicateSkuError, ValidationError
+from inventory.locations import validate_location_id
 from inventory.queries import Item, get_category_by_code, get_skus_for_prefix_slug
 from inventory.sku import generate_sku, slugify_name
 from inventory.uniqueness import sku_exists
@@ -38,6 +39,14 @@ def create_item(
     category_code: str,
     identity_mode: str,
     sku: Optional[str] = None,
+    # Shelving/location feature, confirmed 2026-10-01 — optional, defaults
+    # to None so every pre-existing caller is unaffected. This is the
+    # standalone item-creation path behind the Inventory screen's own
+    # "+ Add New Item" panel — a genuinely separate insertion point from
+    # save_purchase()'s inline new-item creation and
+    # intake_consigned_units()'s own insert (see inventory/locations.py's
+    # module docstring).
+    location_id: Optional[int] = None,
 ) -> Item:
     name = (name or "").strip()
     if not name:
@@ -48,6 +57,13 @@ def create_item(
     category = get_category_by_code(conn, category_code)
     if category is None:
         raise ValidationError(f"Unknown category_code: {category_code!r}")
+
+    # Validated BEFORE the savepoint below (same reasoning as
+    # inventory/locations.py::validate_location_id's own docstring): a bad
+    # location_id must surface as a plain ValidationError, never be
+    # mis-caught as a DuplicateSkuError by the except block that savepoint
+    # is actually there to guard.
+    validate_location_id(conn, location_id)
 
     if sku and sku.strip():
         resolved_sku = sku.strip().upper()
@@ -67,17 +83,25 @@ def create_item(
         with conn.begin_nested():
             item_id = conn.execute(
                 text(
-                    "INSERT INTO items (sku, name, category_id, identity_mode) "
-                    "VALUES (:sku, :name, :category_id, :identity_mode) RETURNING id"
+                    "INSERT INTO items (sku, name, category_id, identity_mode, location_id) "
+                    "VALUES (:sku, :name, :category_id, :identity_mode, :location_id) RETURNING id"
                 ),
                 {
                     "sku": resolved_sku,
                     "name": name,
                     "category_id": category.id,
                     "identity_mode": identity_mode,
+                    "location_id": location_id,
                 },
             ).scalar_one()
     except IntegrityError as exc:
         raise DuplicateSkuError(resolved_sku) from exc
 
-    return Item(id=item_id, sku=resolved_sku, name=name, category_id=category.id, identity_mode=identity_mode)
+    return Item(
+        id=item_id,
+        sku=resolved_sku,
+        name=name,
+        category_id=category.id,
+        identity_mode=identity_mode,
+        location_id=location_id,
+    )

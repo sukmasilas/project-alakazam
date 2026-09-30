@@ -84,3 +84,9 @@ def register_page_routes(app, templates: Jinja2Templates) -> None:
         return templates.TemplateResponse(
             request, "consignor_reimbursements.html", {"active_nav": "reimbursements"}
         )
+
+    @app.get("/locations")
+    async def locations_page(request: Request):
+        return templates.TemplateResponse(
+            request, "locations.html", {"active_nav": "locations"}
+        )

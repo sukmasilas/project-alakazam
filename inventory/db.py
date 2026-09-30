@@ -26,6 +26,11 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 # explicit list (not introspection) so drop_schema() can never accidentally
 # reach a database it shouldn't and drop something unexpected.
 _ALL_OBJECTS_NEWEST_FIRST = [
+    # Migration 007 (shelving/location tracking, confirmed 2026-10-01). The
+    # items.location_id column needs no separate entry — the items table is
+    # already listed further down (migration 001) and DROP TABLE ...
+    # CASCADE removes it along with everything else about that table.
+    ("TABLE", "locations"),
     # Migration 006 (Milestone 8 — consignment tracking). The items.consignor_id
     # column and serial_units.purchase_line_item_id becoming nullable need no
     # separate entry — those two tables are already listed further down

@@ -13,6 +13,7 @@
  */
 
 let categoriesCache = [];
+let locationsCache = [];
 let draftPurchase = null;
 let lineIdSeq = 0;
 
@@ -55,7 +56,11 @@ function skuLabelFor(l) {
 }
 
 async function initPurchaseEntryPage() {
-  categoriesCache = (await apiGet("/api/categories")) || [];
+  [categoriesCache, locationsCache] = await Promise.all([
+    apiGet("/api/categories"), apiGet("/api/locations"),
+  ]);
+  categoriesCache = categoriesCache || [];
+  locationsCache = locationsCache || [];
   draftPurchase = emptyDraft();
   draftPurchase.lines.push(mkLine({}));
 
@@ -298,7 +303,7 @@ function shippingSubFieldsHTML(l) {
 }
 
 function newSkuBoxHTML(l) {
-  const ns = l.newSku || { code: "", name: "", category: (categoriesCache[0] || {}).code, identity: "fungible", skuTouched: false };
+  const ns = l.newSku || { code: "", name: "", category: (categoriesCache[0] || {}).code, identity: "fungible", skuTouched: false, locationId: "" };
   return `
   <div class="new-sku-box">
     <div class="nsfield"><label>Name</label><input type="text" id="line-${l.id}-ns-name" value="${escapeAttr(ns.name || "")}" placeholder="Item name"></div>
@@ -315,6 +320,12 @@ function newSkuBoxHTML(l) {
       <label>SKU Code <button type="button" class="link-btn" style="font-size:11px;" id="line-${l.id}-ns-regen">🔄 Regenerate</button></label>
       <input type="text" id="line-${l.id}-ns-code" value="${escapeAttr(ns.code || "")}" placeholder="Auto-generated as you type the name">
       <div class="sku-check" id="line-${l.id}-ns-code-check"></div>
+    </div>
+    <div class="nsfield"><label>Location (optional)</label>
+      <select id="line-${l.id}-ns-location">
+        <option value="">— None —</option>
+        ${locationsCache.map(loc => `<option value="${loc.id}" ${String(ns.locationId) === String(loc.id) ? "selected" : ""}>${escapeAttr(loc.name)}</option>`).join("")}
+      </select>
     </div>
   </div>`;
 }
@@ -428,7 +439,7 @@ function pickComboboxItem(lineId, sku, identityMode) {
 function pickComboboxNew(lineId) {
   const l = draftPurchase.lines.find(x => x.id === lineId);
   l.skuMode = "new"; l.sku = "";
-  l.newSku = l.newSku || { code: "", name: "", category: (categoriesCache[0] || {}).code, identity: "fungible", skuTouched: false };
+  l.newSku = l.newSku || { code: "", name: "", category: (categoriesCache[0] || {}).code, identity: "fungible", skuTouched: false, locationId: "" };
   rebuildLineRow(l);
 }
 
@@ -473,6 +484,7 @@ function wireNewSkuBoxEvents(l) {
   const idEl = document.getElementById(`line-${l.id}-ns-identity`);
   const codeEl = document.getElementById(`line-${l.id}-ns-code`);
   const regenBtn = document.getElementById(`line-${l.id}-ns-regen`);
+  const locationEl = document.getElementById(`line-${l.id}-ns-location`);
 
   nameEl.oninput = async () => {
     l.newSku.name = nameEl.value;
@@ -487,6 +499,7 @@ function wireNewSkuBoxEvents(l) {
   idEl.onchange = () => { l.newSku.identity = idEl.value; rebuildLineRow(l); };
   codeEl.oninput = async () => { l.newSku.skuTouched = true; l.newSku.code = codeEl.value.trim().toUpperCase(); await refreshNewSkuCheck(l); };
   regenBtn.onclick = async () => { l.newSku.skuTouched = false; await refreshGeneratedSkuForLine(l); codeEl.value = l.newSku.code; await refreshNewSkuCheck(l); };
+  if (locationEl) locationEl.onchange = () => { l.newSku.locationId = locationEl.value; };
 }
 
 /* ---- Line-level event wiring ---- */
@@ -749,7 +762,11 @@ function buildPurchasePayload() {
       ships_separately: !!l.shipsSeparately,
     };
     if (l.skuMode === "new") {
-      line.new_item = { name: l.newSku.name, category_code: l.newSku.category, identity_mode: l.newSku.identity, sku: l.newSku.code || null };
+      line.new_item = {
+        name: l.newSku.name, category_code: l.newSku.category, identity_mode: l.newSku.identity,
+        sku: l.newSku.code || null,
+        location_id: l.newSku.locationId ? parseInt(l.newSku.locationId, 10) : null,
+      };
     } else {
       line.sku = l.sku;
     }

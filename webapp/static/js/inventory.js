@@ -5,13 +5,17 @@
 
 let categoriesCache = [];
 let categoryStatsCache = [];
+let locationsCache = [];
 let inventoryCatFilter = "All";
 let addItemDraft = null;
 
 async function loadInventoryPage() {
-  const [cats, stats] = await Promise.all([apiGet("/api/categories"), apiGet("/api/categories/stats")]);
+  const [cats, stats, locs] = await Promise.all([
+    apiGet("/api/categories"), apiGet("/api/categories/stats"), apiGet("/api/locations"),
+  ]);
   categoriesCache = cats || [];
   categoryStatsCache = stats || [];
+  locationsCache = locs || [];
   renderCatNav();
   document.getElementById("inv-search").oninput = debounce(renderInventoryTable, 200);
   document.getElementById("inv-identity-filter").onchange = renderInventoryTable;
@@ -89,7 +93,7 @@ async function renderInventoryTable() {
 function toggleAddItemPanel() {
   const panel = document.getElementById("add-item-panel");
   if (panel.style.display === "none") {
-    addItemDraft = { name: "", category: categoriesCache[0] ? categoriesCache[0].code : "", identity: "fungible", code: "", skuTouched: false };
+    addItemDraft = { name: "", category: categoriesCache[0] ? categoriesCache[0].code : "", identity: "fungible", code: "", skuTouched: false, locationId: "" };
     panel.style.display = "block";
     renderAddItemPanel();
   } else {
@@ -120,6 +124,10 @@ async function renderAddItemPanel() {
         <input type="text" id="ai-code" value="${escapeAttr(d.code)}">
         <div class="sku-check" id="ai-code-check"></div>
       </div>
+      <div class="nsfield"><label>Location (optional)</label><select id="ai-location">
+        <option value="">— None —</option>
+        ${locationsCache.map(l => `<option value="${l.id}" ${String(d.locationId) === String(l.id) ? "selected" : ""}>${escapeAttr(l.name)}</option>`).join("")}
+      </select></div>
     </div>
     <button class="btn btn-primary btn-sm" id="ai-save-btn" disabled>Add Item</button>
     <button class="btn btn-sm" id="ai-cancel-btn">Cancel</button>
@@ -154,6 +162,7 @@ function wireAddItemEvents() {
     await refreshAddItemCheck();
   };
   document.getElementById("ai-identity").onchange = (e) => { d.identity = e.target.value; };
+  document.getElementById("ai-location").onchange = (e) => { d.locationId = e.target.value; };
   document.getElementById("ai-code").oninput = async (e) => {
     d.skuTouched = true;
     d.code = e.target.value.trim().toUpperCase();
@@ -172,7 +181,10 @@ function wireAddItemEvents() {
 async function saveNewItem() {
   const d = addItemDraft;
   try {
-    const item = await apiPost("/api/items", { name: d.name, category_code: d.category, identity_mode: d.identity, sku: d.code });
+    const item = await apiPost("/api/items", {
+      name: d.name, category_code: d.category, identity_mode: d.identity, sku: d.code,
+      location_id: d.locationId ? parseInt(d.locationId, 10) : null,
+    });
     if (!item) return;
     showToast(`Item ${item.sku} added.`);
     document.getElementById("add-item-panel").style.display = "none";

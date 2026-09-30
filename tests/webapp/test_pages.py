@@ -45,3 +45,10 @@ def test_health_check_is_reachable_with_no_auth(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
+
+
+def test_locations_page_renders(client):
+    resp = client.get("/locations")
+    assert resp.status_code == 200
+    assert "Locations" in resp.text
+    assert "locations.js" in resp.text
