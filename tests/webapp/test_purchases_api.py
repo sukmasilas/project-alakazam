@@ -204,7 +204,7 @@ def test_purchase_history_list_and_detail(client):
 
     detail = client.get(f"/api/purchases/{ref}").json()
     assert detail["vendor_description"] == "History Vendor"
-    assert detail["lines"][0]["sku"].startswith("OTH-HISTORY-ITEM")
+    assert detail["lines"][0]["sku"].startswith("OTH-HIST-ITEM")
 
     missing = client.get("/api/purchases/PUR-2026-9999")
     assert missing.status_code == 404

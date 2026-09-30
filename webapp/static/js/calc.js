@@ -105,10 +105,22 @@ function splitSerialUnitCosts(lineTotal, quantity) {
  * responsibility to include, same division of labor as sku.py's own
  * docstring describes for its Python callers).
  */
+/* Matches inventory/sku.py::slugify_name exactly, including the
+ * 2026-09-30 change: each of the first 1-2 words is cleaned up (collapsed
+ * non-alnum runs, upper-cased) THEN truncated to a maximum of 4 letters,
+ * before being joined with a hyphen — e.g. "Charizard VMAX Box" -> "CHAR-VMAX"
+ * (was "CHARIZARD-VMAX" before this change).
+ */
 function slugifyName(name) {
   const words = (name || "").trim().split(/\s+/).filter(Boolean).slice(0, 2);
-  const slug = words.join(" ").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  return slug || "ITEM";
+  const parts = [];
+  words.forEach(word => {
+    const cleaned = word.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    if (!cleaned) return;
+    const truncated = cleaned.slice(0, 4).replace(/^-+|-+$/g, "");
+    if (truncated) parts.push(truncated);
+  });
+  return parts.join("-") || "ITEM";
 }
 function generateSkuCandidate(categoryPrefix, name, existingSkus) {
   const slug = slugifyName(name);

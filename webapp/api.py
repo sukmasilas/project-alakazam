@@ -25,6 +25,7 @@ from ingestion.ebay_csv import EbayCsvFormatError
 from inventory import consignment as consignment_engine
 from inventory import depletions as depletions_engine
 from inventory import items as items_engine
+from inventory import opening_inventory as opening_inventory_engine
 from inventory import preorders as preorders_engine
 from inventory import purchases as purchases_engine
 from inventory import queries
@@ -39,11 +40,13 @@ from webapp.schemas import (
     EbayRowMatchIn,
     FungibleDepletionIn,
     NewItemCreateIn,
+    OpeningInventoryIn,
     PreorderFulfillIn,
     PreorderSaleCreateIn,
     PurchaseIn,
     ReimbursementMarkPaidIn,
     SerialDepletionIn,
+    to_opening_inventory_input,
     to_purchase_input,
 )
 
@@ -256,6 +259,24 @@ def api_save_purchase(body: PurchaseIn, conn: Connection = Depends(get_write_con
     purchase_input = to_purchase_input(body)
     try:
         saved = purchases_engine.save_purchase(conn, purchase_input)
+    except AlakazamError as exc:
+        raise _error_response(exc) from exc
+    return serialize(saved)
+
+
+# --------------------------------------------------------------------- #
+# Opening inventory entry — 2026-09-30 readiness-gap decision. This is a
+# real Purchase under the hood (inventory.opening_inventory.
+# record_opening_inventory() calls the same, unmodified save_purchase())
+# — never a hand-rolled insert bypassing the real engine.
+# --------------------------------------------------------------------- #
+
+
+@router.post("/opening-inventory", status_code=201)
+def api_record_opening_inventory(body: OpeningInventoryIn, conn: Connection = Depends(get_write_conn)):
+    entry_input = to_opening_inventory_input(body)
+    try:
+        saved = opening_inventory_engine.record_opening_inventory(conn, entry_input)
     except AlakazamError as exc:
         raise _error_response(exc) from exc
     return serialize(saved)

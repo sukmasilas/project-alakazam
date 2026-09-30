@@ -11,10 +11,21 @@ from inventory.sku import generate_sku, slugify_name
 
 class TestSlugifyName:
     def test_first_two_words_only(self):
-        assert slugify_name("Charizard VMAX Box") == "CHARIZARD-VMAX"
+        # "Charizard" (9 letters) truncates to "CHAR"; "VMAX" (4 letters)
+        # is already <=4 so is unchanged (CLAUDE.md, "SKU/serial-ID format
+        # change, confirmed 2026-09-30").
+        assert slugify_name("Charizard VMAX Box") == "CHAR-VMAX"
 
     def test_single_word(self):
-        assert slugify_name("Rolex") == "ROLEX"
+        # "Rolex" (5 letters) truncates to "ROLE".
+        assert slugify_name("Rolex") == "ROLE"
+
+    def test_word_already_four_letters_or_fewer_is_unchanged(self):
+        assert slugify_name("Ring") == "RING"
+        assert slugify_name("Go") == "GO"
+
+    def test_word_longer_than_four_letters_is_truncated(self):
+        assert slugify_name("Automotive") == "AUTO"
 
     def test_non_alnum_collapsed_to_single_hyphen(self):
         slug = slugify_name("Item---With   Spaces")
@@ -22,29 +33,43 @@ class TestSlugifyName:
         assert not slug.endswith("-")
         assert "--" not in slug
 
+    def test_truncation_happens_on_cleaned_slug_not_raw_word(self):
+        # "S.H.Figuarts" collapses (non-alnum runs -> single hyphen) to
+        # "S-H-FIGUARTS" BEFORE truncation, so the first 4 characters of the
+        # cleaned slug are taken (and any resulting trailing hyphen is
+        # stripped) — not the first 4 characters of the raw word.
+        assert slugify_name("S.H.Figuarts") == "S-H"
+
     def test_empty_name_falls_back_to_item(self):
         assert slugify_name("") == "ITEM"
         assert slugify_name("   ") == "ITEM"
 
+    def test_name_with_only_non_alnum_characters_falls_back_to_item(self):
+        assert slugify_name("!!! ???") == "ITEM"
+
 
 class TestGenerateSku:
     def test_first_sku_for_a_new_family_starts_at_0001(self):
-        assert generate_sku("TCG", "Charizard VMAX Box", existing_skus=[]) == "TCG-CHARIZARD-VMAX-0001"
+        assert generate_sku("TCG", "Charizard VMAX Box", existing_skus=[]) == "TCG-CHAR-VMAX-0001"
 
     def test_sequence_scoped_to_prefix_and_slug_combination(self):
-        existing = ["TCG-CHARIZARD-VMAX-0001", "TCG-YUGIOH-STARTER-DECK-0001"]
-        # A second, unrelated TCG item does not bump the Charizard family's counter.
-        assert generate_sku("TCG", "Yugioh Starter Deck", existing) == "TCG-YUGIOH-STARTER-0001"
-        # A second Charizard VMAX item correctly increments.
-        assert generate_sku("TCG", "Charizard VMAX Box", existing) == "TCG-CHARIZARD-VMAX-0002"
+        existing = ["TCG-CHAR-VMAX-0001", "TCG-YUGI-STAR-DECK-0001"]
+        # "TCG-YUGI-STAR-DECK-0001" does NOT match the "Yugioh Starter Deck"
+        # slug family's own pattern (^TCG-YUGI-STAR-(\d{4})$ requires the
+        # segment right after "STAR-" to be exactly 4 digits) — it's an
+        # unrelated SKU that happens to share a prefix, so it doesn't bump
+        # this family's counter either.
+        assert generate_sku("TCG", "Yugioh Starter Deck", existing) == "TCG-YUGI-STAR-0001"
+        # A second Charizard VMAX item correctly increments its own family.
+        assert generate_sku("TCG", "Charizard VMAX Box", existing) == "TCG-CHAR-VMAX-0002"
 
     def test_case_insensitive_matching_against_existing_skus(self):
-        existing = ["tcg-charizard-vmax-0003"]
-        assert generate_sku("TCG", "Charizard VMAX Box", existing) == "TCG-CHARIZARD-VMAX-0004"
+        existing = ["tcg-char-vmax-0003"]
+        assert generate_sku("TCG", "Charizard VMAX Box", existing) == "TCG-CHAR-VMAX-0004"
 
     def test_different_category_prefix_is_a_different_family_even_with_same_slug(self):
-        existing = ["TCG-CHARIZARD-VMAX-0001"]
-        assert generate_sku("TOY", "Charizard VMAX Plush", existing) == "TOY-CHARIZARD-VMAX-0001"
+        existing = ["TCG-CHAR-VMAX-0001"]
+        assert generate_sku("TOY", "Charizard VMAX Plush", existing) == "TOY-CHAR-VMAX-0001"
 
 
 class TestGenerateSerialId:

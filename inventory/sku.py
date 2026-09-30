@@ -1,12 +1,18 @@
 """SKU generation — ports docs/design/mockup.html's ``generateSku`` /
-``slugifyName`` faithfully.
+``slugifyName`` faithfully, as later revised by CLAUDE.md's "SKU/serial-ID
+format change, confirmed 2026-09-30".
 
-Convention (design doc, "placeholder pending real user confirmation, not a
-settled rule" — implemented exactly as documented, not silently changed):
+Convention:
 
-    {CATEGORY_PREFIX}-{first 1-2 words of the item name, slugified}-{4-digit sequence}
+    {CATEGORY_PREFIX}-{first 1-2 words of the item name, each truncated to a
+    maximum of 4 letters, slugified}-{4-digit sequence}
 
-e.g. "Charizard VMAX Box" in TCG -> ``TCG-CHARIZARD-VMAX-0001``.
+e.g. "Charizard VMAX Box" in TCG -> ``TCG-CHAR-VMAX-0001`` (was
+``TCG-CHARIZARD-VMAX-0001`` before the 2026-09-30 change — "Charizard"
+truncates to "CHAR", "VMAX" is already <=4 letters so is unchanged). Only the
+name portion is truncated — category prefixes (``TCG``/``WATCH``/``AUTO``/
+``TOY``/``OTH``) and the ``CONSIGN-`` tag are untouched by this rule (see
+``inventory/consignment.py``).
 
 The sequence is scoped to the prefix+slug combination, not the whole
 category (design doc Open Question 6) — a second, unrelated TCG item
@@ -21,6 +27,10 @@ the same in-flight purchase (mirrors the mockup's ``generateSku`` scanning
 both ``itemsMaster`` and ``draftPurchase.lines``) — this is what stops two
 new-item lines in one purchase from colliding with each other before either
 has been saved.
+
+This is a forward-only change — SKUs already generated under the old
+"full word" convention are never retroactively renamed (none exist in real
+production data as of the 2026-09-30 decision).
 """
 from __future__ import annotations
 
@@ -29,16 +39,36 @@ from typing import Iterable
 
 _NON_ALNUM_RUN = re.compile(r"[^A-Z0-9]+")
 
+_MAX_WORD_LETTERS = 4
+
+
+def _clean_word(word: str) -> str:
+    """Upper-cases a single word and collapses any run of non-alphanumeric
+    characters within it to a single hyphen, stripping leading/trailing
+    hyphens — the same collapsing rule ``slugify_name`` always applied,
+    just scoped to one word at a time instead of the whole joined name (so
+    truncation below happens on the cleaned-up slug, not the raw word).
+    """
+    return _NON_ALNUM_RUN.sub("-", (word or "").upper()).strip("-")
+
 
 def slugify_name(name: str) -> str:
-    """First 1-2 words of ``name``, upper-cased, non-alphanumeric runs
-    collapsed to a single hyphen, leading/trailing hyphens stripped.
-    Falls back to "ITEM" for an empty/whitespace-only name.
+    """First 1-2 words of ``name``, each cleaned up (upper-cased,
+    non-alphanumeric runs collapsed to a single hyphen, leading/trailing
+    hyphens stripped) and then truncated to a maximum of 4 letters, joined
+    with a hyphen. Falls back to "ITEM" for an empty/whitespace-only name
+    (or a name whose first 1-2 words are entirely non-alphanumeric).
     """
-    words = (name or "").strip().split()
-    words = words[:2]
-    joined = " ".join(words).upper()
-    slug = _NON_ALNUM_RUN.sub("-", joined).strip("-")
+    words = (name or "").strip().split()[:2]
+    parts = []
+    for word in words:
+        cleaned = _clean_word(word)
+        if not cleaned:
+            continue
+        truncated = cleaned[:_MAX_WORD_LETTERS].strip("-")
+        if truncated:
+            parts.append(truncated)
+    slug = "-".join(parts)
     return slug or "ITEM"
 
 

@@ -214,3 +214,67 @@ class ConsignmentIntakeIn(BaseModel):
 class ReimbursementMarkPaidIn(BaseModel):
     paid_date: Optional[date] = None
     payment_reference: Optional[str] = None
+
+
+# --------------------------------------------------------------------- #
+# Opening inventory entry — 2026-09-30 readiness-gap decision. A thin wire
+# shape over inventory.opening_inventory.OpeningInventoryInput; reuses
+# NewItemIn/SerialUnitIn (the same shapes /api/purchases already uses) so
+# there is no second, parallel new-item-creation or serial-unit schema.
+# --------------------------------------------------------------------- #
+
+
+class OpeningInventoryIn(BaseModel):
+    quantity: int = 1
+    price_entry_mode: str = "total"
+    price_value: Decimal = Decimal("0")
+
+    # Exactly one of the two below must be given — enforced server-side by
+    # inventory.purchases.save_purchase() (via record_opening_inventory()),
+    # never trusted from the client.
+    sku: Optional[str] = None
+    new_item: Optional[NewItemIn] = None
+
+    entry_date: Optional[date] = None
+    # None/blank => "Opening Inventory" (see
+    # inventory.opening_inventory.DEFAULT_VENDOR_LABEL) — always a plain,
+    # editable string, never a separate flag.
+    vendor_description: Optional[str] = None
+
+    serial_units: Optional[list[SerialUnitIn]] = None
+
+
+def to_opening_inventory_input(body: OpeningInventoryIn):
+    """Straight field-for-field mapping into the real engine's dataclass
+    (inventory/opening_inventory.py) — no computation here, same discipline
+    as ``to_purchase_input`` above.
+    """
+    from inventory import opening_inventory as opening_inventory_engine
+
+    new_item = None
+    if body.new_item is not None:
+        new_item = purchases_engine.NewItemInput(
+            name=body.new_item.name,
+            category_code=body.new_item.category_code,
+            identity_mode=body.new_item.identity_mode,
+            sku=body.new_item.sku,
+        )
+    serial_units = None
+    if body.serial_units is not None:
+        serial_units = [
+            opening_inventory_engine.OpeningInventorySerialUnitInput(
+                serial_id=su.serial_id, cost=su.cost
+            )
+            for su in body.serial_units
+        ]
+
+    return opening_inventory_engine.OpeningInventoryInput(
+        quantity=body.quantity,
+        price_entry_mode=body.price_entry_mode,
+        price_value=body.price_value,
+        sku=body.sku,
+        new_item=new_item,
+        entry_date=body.entry_date,
+        vendor_description=body.vendor_description,
+        serial_units=serial_units,
+    )

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Opening Inventory{% endblock %}
+{% block page_title %}Opening Inventory{% endblock %}
+{% block content %}
+<h1>Opening Inventory</h1>
+<div class="subtitle">Record inventory you already physically have — no vendor, shipping, or purchase-history detail needed, just an item, a quantity, and a rough value. This still saves as a real Purchase under the hood (direct pricing, no shipping), so it shows up in Purchase History and On-Hand Stock exactly like any other purchase.</div>
+
+<div class="pe-header">
+  <div class="pe-field"><label>Date</label><input type="date" id="oi-date"></div>
+  <div class="pe-field" style="flex:1.4;"><label>Vendor / Description</label><input type="text" id="oi-vendor" placeholder="Opening Inventory"></div>
+</div>
+
+<div class="control-box">
+  <div class="control-box-title">Item</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">
+    <label style="font-size:13px;"><input type="radio" name="oi-item-mode" value="existing" checked> Existing item on file</label>
+    <label style="font-size:13px;"><input type="radio" name="oi-item-mode" value="new"> Create a new item</label>
+  </div>
+
+  <div id="oi-existing-item-form">
+    <div class="combobox-field" style="min-width:280px;">
+      <label style="display:block;font-size:12px;margin-bottom:4px;">Item / SKU</label>
+      <div class="combobox">
+        <input type="text" class="combobox-input" id="oi-existing-search" autocomplete="off" placeholder="Type a SKU or item name…">
+        <div class="combobox-dropdown" id="oi-existing-dropdown" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+  <div id="oi-new-item-form" style="display:none;"></div>
+</div>
+
+<div class="control-box">
+  <div class="control-box-title">Quantity &amp; Value</div>
+  <div class="pricing-row">
+    <div class="lfield" style="width:120px;"><label>Quantity</label><input type="number" min="1" step="1" id="oi-qty" value="1"></div>
+    <div class="price-toggle-group">
+      <div class="lfield"><label>Value</label>
+        <div class="price-input-row">
+          <input type="number" min="0" step="1000" id="oi-pricevalue" value="0">
+          <div class="mini-toggle">
+            <button type="button" class="mtbtn active" data-mode="per_unit">Per unit</button>
+            <button type="button" class="mtbtn" data-mode="total">Total</button>
+          </div>
+        </div>
+      </div>
+      <div class="computed-mirror" id="oi-price-mirror"></div>
+    </div>
+  </div>
+  <div class="line-outputs">
+    <div class="out">Total Cost<b id="oi-total-cost">Rp 0</b></div>
+  </div>
+</div>
+
+<div id="oi-serial-area"></div>
+
+<div class="balance-panel" id="oi-panel" style="margin-top:18px;">
+  <div class="balance-left">
+    <div class="balance-text">
+      <div class="detail" id="oi-panel-detail">Fill in an item, quantity, and value above.</div>
+    </div>
+  </div>
+  <button class="btn btn-primary" id="oi-submit-btn" disabled>Save Opening Inventory Entry</button>
+</div>
+<div id="oi-server-error" class="assumption-note" style="display:none;border-color:var(--red-border);color:var(--red-text);"></div>
+<div id="oi-success" style="display:none;color:var(--green-text, #2a8);font-size:12.5px;margin-top:8px;"></div>
+{% endblock %}
+{% block scripts %}<script src="{{ root_path }}/static/js/opening_inventory.js"></script>{% endblock %}

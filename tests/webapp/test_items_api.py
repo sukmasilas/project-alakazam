@@ -11,7 +11,7 @@ def test_create_item_generates_real_sku(client):
     )
     assert resp.status_code == 201, resp.text
     body = resp.json()
-    assert body["sku"] == "TCG-CHARIZARD-VMAX-0001"
+    assert body["sku"] == "TCG-CHAR-VMAX-0001"
     assert body["name"] == "Charizard VMAX Box"
 
 
@@ -22,8 +22,8 @@ def test_create_item_sequence_scoped_to_prefix_slug(client):
     second = client.post(
         "/api/items", json={"name": "Charizard VMAX Deck", "category_code": "TCG", "identity_mode": "fungible"}
     ).json()
-    assert first["sku"] == "TCG-CHARIZARD-VMAX-0001"
-    assert second["sku"] == "TCG-CHARIZARD-VMAX-0002"
+    assert first["sku"] == "TCG-CHAR-VMAX-0001"
+    assert second["sku"] == "TCG-CHAR-VMAX-0002"
 
 
 def test_create_item_duplicate_sku_rejected_by_real_engine(client):
@@ -41,14 +41,14 @@ def test_create_item_duplicate_sku_rejected_by_real_engine(client):
 
 def test_sku_candidates_and_check_endpoints(client):
     candidates = client.get("/api/skus/candidates?category_code=TCG&name=Pikachu%20Promo").json()
-    assert candidates["suggestion"] == "TCG-PIKACHU-PROMO-0001"
+    assert candidates["suggestion"] == "TCG-PIKA-PROM-0001"
 
-    check_before = client.get("/api/skus/check?sku=TCG-PIKACHU-PROMO-0001").json()
+    check_before = client.get("/api/skus/check?sku=TCG-PIKA-PROM-0001").json()
     assert check_before["exists"] is False
 
     client.post("/api/items", json={"name": "Pikachu Promo", "category_code": "TCG", "identity_mode": "fungible"})
 
-    check_after = client.get("/api/skus/check?sku=TCG-PIKACHU-PROMO-0001").json()
+    check_after = client.get("/api/skus/check?sku=TCG-PIKA-PROM-0001").json()
     assert check_after["exists"] is True
 
 
@@ -58,7 +58,7 @@ def test_item_search_typeahead(client):
 
     results = client.get("/api/items/search?q=omega").json()
     assert len(results) == 1
-    assert results[0]["sku"] == "WATCH-OMEGA-SPEEDMASTER-0001"
+    assert results[0]["sku"] == "WATCH-OMEG-SPEE-0001"
 
     empty = client.get("/api/items/search?q=").json()
     assert empty == []

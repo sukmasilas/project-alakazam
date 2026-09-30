@@ -34,9 +34,11 @@ confirmed 2026-09-15" for the full scope and rationale. Summary:
 
 ## SKU convention for consigned items (placeholder — see module note below)
 
-``CONSIGN-{CATEGORY_PREFIX}-{first 1-2 words of name, slugified}-{4-digit
-sequence}`` — e.g. "Rolex Daytona" consigned under Watches ->
-``CONSIGN-WATCH-ROLEX-DAYTONA-0001``. Built by reusing
+``CONSIGN-{CATEGORY_PREFIX}-{first 1-2 words of name, each truncated to 4
+letters, slugified}-{4-digit sequence}`` (see CLAUDE.md's "SKU/serial-ID
+format change, confirmed 2026-09-30" and ``inventory/sku.py``) — e.g. "Rolex
+Daytona" consigned under Watches -> ``CONSIGN-WATCH-ROLE-DAYT-0001``. Built
+by reusing
 ``inventory.sku.generate_sku()`` UNCHANGED: this module simply passes
 ``f"CONSIGN-{category.sku_prefix}"`` as the "category prefix" argument,
 which that function treats as an opaque leading string — no change to

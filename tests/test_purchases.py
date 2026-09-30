@@ -643,15 +643,17 @@ class TestPurchaseRefGenerationGenuineConcurrency:
             results: dict = {}
 
             def build_purchase(name: str) -> PurchaseInput:
-                # Deliberately single-word, mutually-distinct item names
-                # (not e.g. "Ref Race Widget A"/"Ref Race Widget B", which
-                # share the same first-two-words SKU slug — see
-                # inventory/sku.py::slugify_name) so the two racers can
-                # NEVER collide on SKU generation itself. That's a real,
-                # separate, already-covered invariant
-                # (TestGenuineConcurrencyLeavesConnectionUsable above) —
-                # this test isolates ONLY the purchase_ref race.
-                item_name = f"RefRace{name.upper()}Trial{trial}"
+                # Deliberately single-word, mutually-distinct item names,
+                # with the racer-distinguishing letter placed FIRST (not
+                # e.g. "RefRaceATrial0"/"RefRaceBTrial0", whose first 1-2
+                # words — after the 2026-09-30 "truncate each word to 4
+                # letters" change, see inventory/sku.py::slugify_name — both
+                # collapse to the identical 4-letter slug "REFR", which
+                # WOULD collide) so the two racers can NEVER collide on SKU
+                # generation itself. That's a real, separate, already-
+                # covered invariant (TestGenuineConcurrencyLeavesConnectionUsable
+                # above) — this test isolates ONLY the purchase_ref race.
+                item_name = f"{name.upper()}RefRaceTrial{trial}"
                 return PurchaseInput(
                     purchase_date=date(2026, 9, 14),
                     vendor_description=f"Unrelated purchase — {name}",

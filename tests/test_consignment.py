@@ -99,7 +99,7 @@ class TestIntakeConsignedUnits:
                 quantity=2,
             ),
         )
-        assert result.sku.startswith("CONSIGN-WATCH-ROLEX-DAYTONA-")
+        assert result.sku.startswith("CONSIGN-WATCH-ROLE-DAYT-")
         assert result.consignor_id == consignor.id
         assert len(result.serial_ids) == 2
         assert len(set(result.serial_ids)) == 2  # genuinely distinct

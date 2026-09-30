@@ -37,6 +37,12 @@ def register_page_routes(app, templates: Jinja2Templates) -> None:
             request, "purchase_entry.html", {"active_nav": "purchase"}
         )
 
+    @app.get("/opening-inventory")
+    async def opening_inventory_page(request: Request):
+        return templates.TemplateResponse(
+            request, "opening_inventory.html", {"active_nav": "opening_inventory"}
+        )
+
     @app.get("/purchases")
     async def purchase_history_page(request: Request, ref: str = ""):
         return templates.TemplateResponse(
