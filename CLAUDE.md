@@ -183,6 +183,15 @@ One real correction during review: Builder's first-round self-report claimed two
 
 **Deployed to production, confirmed 2026-09-30**: Alakazam is now live and reachable at `dotworks.net/alakazam/*` on the shared droplet, per the user.
 
+**Deploy access — scoped, not root (as of 2026-09-30).** Per Dotworks' "Infra task: per-project scoped deploy access" (see `dotworks-main/CLAUDE.md`), this app now runs under its own non-root `alakazam` Linux user, its own `pm2` daemon (`pm2-alakazam.service`), and its own SSH key — not the old shared root key/pm2 daemon. Routine deploy:
+```
+ssh -i ~/.ssh/id_ed25519_alakazam_deploy alakazam@<droplet-ip>
+cd /opt/apps/alakazam
+git pull
+pm2 restart alakazam
+```
+The `alakazam` user has no sudo and cannot see or touch Dotworks' or Noctrowl's files or processes — that boundary is enforced by Linux, not convention. The shared root key is retained only for genuinely cross-cutting work (nginx, Postgres roles, OS packages) and belongs to whoever is acting as infra coordinator, not to routine Alakazam deploys. Full history/rationale of the migration lives in `dotworks-main/CLAUDE.md`, not duplicated here.
+
 **Readiness gaps for real data entry, identified and being closed, 2026-09-30**: the user wants to start entering their real, existing inventory as stock units. Investigation found:
 1. **No opening-inventory mechanism** — on-hand quantity/cost is entirely derived from `purchases`/`purchase_line_items`, and the full Purchase Entry flow (vendor, shipping mode, lump-sum allocation) assumes real historical purchase detail. **Confirmed by the user: they only have current quantities and rough values for existing stock, not original per-item purchase costs/vendors/dates.** A simpler opening-inventory entry path is needed — see the decision below.
 2. **Photo/invoice attachment is still 100% simulated** (only a filename + fake status persists, no real file ever stored) — **confirmed by the user: defer this, not needed for initial data entry.** Not being built now.
