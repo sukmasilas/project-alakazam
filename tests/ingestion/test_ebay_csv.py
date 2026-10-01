@@ -40,9 +40,16 @@ class TestRealSampleFiles:
         for path in _ACCOUNT_1_FILES:
             text = path.read_text(encoding="utf-8-sig")
             result = parse_ebay_transaction_report(text)
-            assert result.seller == "ricky.game"
-            # Every real month has real Order line items and at least one
-            # other row type (Other fee is present in all 4 samples).
+            # Real, confirmed account history: this account was renamed
+            # partway through (Jan-Apr 2026 raw CSVs say "ricky.hobbies",
+            # May 2026 onward say "ricky.game") — both are legitimate
+            # historical seller names for the same account, not a parsing
+            # bug. result.seller is only ever stored as informational
+            # metadata (ingestion/ebay_import.py), never a matching key.
+            assert result.seller in {"ricky.hobbies", "ricky.game"}
+            # Every real month (all 8, Jan-Aug 2026) has real Order line
+            # items and at least one other row type (Other fee is present
+            # in all 8 samples).
             assert len(result.rows) > 0
             assert any(r.row_type == "Order" for r in result.rows)
             assert "Other fee" in result.type_counts
