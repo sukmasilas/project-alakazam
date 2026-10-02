@@ -10,3 +10,4 @@ __pycache__/
 # never commit real credentials or refresh tokens. See .env.example and
 # scripts/authorize_google_drive.py.
 secrets/
+venv/
