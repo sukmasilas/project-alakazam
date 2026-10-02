@@ -199,3 +199,22 @@ class TestReviewFlowThroughApi:
         assert resp.status_code == 200
         assert "eBay Sales Import" in resp.text
         assert "ebay_import.js" in resp.text
+
+
+def test_matching_a_row_to_a_consigned_sku_returns_400(client):
+    consignor = client.post("/api/consignors", json={"name": "Guard API Consignor"}).json()
+    intake = client.post(
+        "/api/consignment/intake",
+        json={"consignor_id": consignor["id"], "new_item_name": "Guard API Watch",
+              "new_item_category_code": "WATCHES", "quantity": 1},
+    ).json()
+    batch_id = _upload(client, "g.csv", [_order_row("11-00000-00001", "9000000001", "Guard API Watch")]).json()["batch_id"]
+    row_id = client.get(f"/api/ebay-import/rows?batch_id={batch_id}").json()[0]["id"]
+
+    resp = client.post(
+        f"/api/ebay-import/rows/{row_id}/match",
+        json={"sku": intake["sku"], "serial_ids": [intake["serial_ids"][0]]},
+    )
+    assert resp.status_code == 400
+    assert resp.json()["detail"]["error_type"] == "InvalidRowActionError"
+    assert client.get(f"/api/ebay-import/serial-options?sku={intake['sku']}").json() == []

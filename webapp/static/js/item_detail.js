@@ -47,10 +47,10 @@ async function loadItemDetail() {
     const rows = data.serialized_units || [];
     body.innerHTML = `
       <table>
-        <thead><tr><th>Serial / Asset ID</th><th>Acquisition Date</th><th class="num">Allocated Cost</th><th>Source Purchase</th><th>Photo</th><th>Status</th></tr></thead>
+        <thead><tr><th>Serial / Asset ID</th><th>Acquisition Date</th><th class="num">Allocated Cost</th><th>Source</th><th>Photo</th><th>Status</th></tr></thead>
         <tbody>${rows.map(u => `
           <tr><td><b>${escapeAttr(u.serial_id)}</b></td><td>${u.acquired_date}</td><td class="num">${fmtIDR(u.cost)}</td>
-          <td><a class="link-btn" href="${appUrl("/purchases?ref=" + encodeURIComponent(u.purchase_ref))}">${escapeAttr(u.purchase_ref)}</a></td>
+          <td>${u.purchase_ref ? `<a class="link-btn" href="${appUrl("/purchases?ref=" + encodeURIComponent(u.purchase_ref))}">${escapeAttr(u.purchase_ref)}</a>` : `<span style="color:var(--text-dim);">Consignment intake</span>`}</td>
           <td>${u.photo_reference ? escapeAttr(u.photo_reference) : `<span style="color:var(--text-dim);font-size:12px;">No photo</span>`}</td>
           <td>${renderSerialStatusCell(data.sku, u)}</td></tr>
         `).join("") || `<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px;">No units on hand.</td></tr>`}</tbody>

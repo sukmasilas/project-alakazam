@@ -475,3 +475,92 @@ class TestProcessConfirmedRowsGenuineConcurrency:
                 {"sku": sku},
             ).scalar_one()
             assert qty == 4
+
+
+class TestConsignedItemsAreGuardedFromEbayImport:
+    """eBay import <-> consignment integration is deferred (no reimbursement
+    record would be created), so consigned items must be neither offered nor
+    matchable here.
+    """
+
+    def _consigned_sku(self, conn):
+        from inventory.consignment import ConsignmentIntakeInput, create_consignor, intake_consigned_units
+
+        consignor = create_consignor(conn, name="Guard Consignor", contact_info=None)
+        return intake_consigned_units(
+            conn,
+            ConsignmentIntakeInput(
+                consignor_id=consignor.id, new_item_name="Guarded Watch",
+                new_item_category_code="WATCHES", quantity=1,
+            ),
+        ).sku
+
+    def test_serial_options_empty_for_consigned_sku(self, conn):
+        assert get_on_hand_serials_for_sku(conn, self._consigned_sku(conn)) == []
+
+    def test_mark_row_matched_rejects_consigned_sku(self, conn):
+        sku = self._consigned_sku(conn)
+        summary = import_csv(conn, "t.csv", _csv([_order_row("11-00000-00001", "9000000001", "Guarded Watch")]))
+        row = list_review_rows(conn, batch_id=summary.batch_id, include_suggestions=False)[0]
+        with pytest.raises(InvalidRowActionError, match="consigned"):
+            mark_row_matched(conn, row.id, sku, serial_ids=["ANY"])
+
+
+class TestProcessConfirmedRowsConsignedGuard:
+    def test_process_refuses_consigned_row_without_blocking_others(self, conn):
+        from inventory.consignment import ConsignmentIntakeInput, create_consignor, intake_consigned_units
+
+        consignor = create_consignor(conn, name="Process Guard Consignor", contact_info=None)
+        intake = intake_consigned_units(
+            conn,
+            ConsignmentIntakeInput(
+                consignor_id=consignor.id, new_item_name="Process Guard Watch",
+                new_item_category_code="WATCHES", quantity=1,
+            ),
+        )
+        serial_id = intake.serial_ids[0]
+        plain_sku = _buy_fungible(conn, "Plain Widget", quantity=5, price_value=1000)
+        summary = import_csv(
+            conn,
+            "t.csv",
+            _csv([
+                _order_row("11-00000-00001", "9000000001", "Process Guard Watch"),
+                _order_row("11-00000-00002", "9000000002", "Plain Widget"),
+            ]),
+        )
+        rows = list_review_rows(conn, batch_id=summary.batch_id, include_suggestions=False)
+        by_title = {r.item_title: r for r in rows}
+        consigned_row = by_title["Process Guard Watch"]
+        plain_row = by_title["Plain Widget"]
+
+        # Simulate a row matched before mark_row_matched had its guard.
+        conn.execute(
+            text(
+                "UPDATE ebay_sales_rows SET review_status = 'matched', "
+                "matched_item_id = (SELECT id FROM items WHERE sku = :sku), "
+                "matched_serial_ids = CAST(:serials AS jsonb) WHERE id = :id"
+            ),
+            {"sku": intake.sku, "serials": f'["{serial_id}"]', "id": consigned_row.id},
+        )
+        mark_row_matched(conn, plain_row.id, plain_sku)
+
+        results = {r.row_id: r for r in process_confirmed_rows(conn, batch_id=summary.batch_id)}
+
+        assert results[consigned_row.id].success is False
+        assert "consigned" in results[consigned_row.id].error
+        assert results[plain_row.id].success is True  # per-row isolation
+
+        status, err = conn.execute(
+            text("SELECT review_status, last_process_error FROM ebay_sales_rows WHERE id = :id"),
+            {"id": consigned_row.id},
+        ).one()
+        assert status == "matched"
+        assert err
+        assert conn.execute(
+            text("SELECT status FROM serial_units WHERE serial_id = :s"), {"s": serial_id}
+        ).scalar_one() == "on_hand"
+        assert conn.execute(
+            text("SELECT COUNT(*) FROM ebay_sales_row_depletions WHERE ebay_sales_row_id = :id"),
+            {"id": consigned_row.id},
+        ).scalar_one() == 0
+        assert conn.execute(text("SELECT COUNT(*) FROM consignor_reimbursements")).scalar_one() == 0

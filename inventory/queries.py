@@ -360,7 +360,7 @@ class SerializedUnitRow:
     serial_id: str
     acquired_date: date_type
     cost: Decimal
-    purchase_ref: str
+    purchase_ref: Optional[str]  # None for a consigned unit (not a purchase)
     photo_reference: Optional[str]
     # Milestone 5 additions — default-valued so get_purchase_detail's own
     # construction of this same dataclass (which deliberately always
@@ -372,7 +372,9 @@ class SerializedUnitRow:
 
 
 def get_serialized_unit_rows(conn: Connection, item_id: int) -> list[SerializedUnitRow]:
-    """Every unit ever purchased for this item — BOTH on_hand and sold —
+    """Every unit ever acquired for this item (purchased, or consigned-intake
+    — those have no purchase, so purchase_ref is None and acquired_date is
+    the intake date) — BOTH on_hand and sold —
     so Item Detail can show full traceability and gate its "Mark as Sold"
     action per row on each unit's own current status. This intentionally
     differs from get_item_stats' on-hand-only rollup above; the two serve
@@ -383,12 +385,13 @@ def get_serialized_unit_rows(conn: Connection, item_id: int) -> list[SerializedU
             """
             SELECT su.serial_id, su.acquired_cost, su.photo_reference,
                    su.status, su.sold_date, su.sold_reference,
-                   p.purchase_date, p.purchase_ref
+                   COALESCE(p.purchase_date, su.created_at::date) AS acquired_date,
+                   p.purchase_ref
             FROM serial_units su
-            JOIN purchase_line_items pli ON pli.id = su.purchase_line_item_id
-            JOIN purchases p ON p.id = pli.purchase_id
+            LEFT JOIN purchase_line_items pli ON pli.id = su.purchase_line_item_id
+            LEFT JOIN purchases p ON p.id = pli.purchase_id
             WHERE su.item_id = :item_id
-            ORDER BY p.purchase_date, su.id
+            ORDER BY COALESCE(p.purchase_date, su.created_at::date), su.id
             """
         ),
         {"item_id": item_id},
@@ -396,7 +399,7 @@ def get_serialized_unit_rows(conn: Connection, item_id: int) -> list[SerializedU
     return [
         SerializedUnitRow(
             serial_id=r.serial_id,
-            acquired_date=r.purchase_date,
+            acquired_date=r.acquired_date,
             cost=Decimal(r.acquired_cost),
             purchase_ref=r.purchase_ref,
             photo_reference=r.photo_reference,

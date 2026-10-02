@@ -629,3 +629,61 @@ class TestMarkReimbursementPaidGenuineConcurrency:
             f"{len(unexpected)}/{self.TRIALS} trials produced an unexpected outcome "
             f"(deadlock or other uncaught error) instead of a clean success/rejection pair: {unexpected}"
         )
+
+
+class TestSerializedUnitRowsIncludeConsigned:
+    """Regression: get_serialized_unit_rows used to INNER JOIN through
+    purchase_line_items, silently dropping consigned units (which have no
+    purchase) — so Item Detail showed no units / no Mark as Sold button.
+    """
+
+    def test_consigned_units_are_listed_and_reflect_sale(self, conn):
+        from inventory.queries import get_serialized_unit_rows
+
+        consignor = _new_consignor(conn)
+        intake = intake_consigned_units(
+            conn,
+            ConsignmentIntakeInput(
+                consignor_id=consignor.id, new_item_name="Listed Watch",
+                new_item_category_code="WATCHES", quantity=2,
+            ),
+        )
+        item = get_item_by_sku(conn, intake.sku)
+        today = conn.execute(text("SELECT now()::date")).scalar_one()
+
+        rows = get_serialized_unit_rows(conn, item.id)
+        assert len(rows) == 2
+        assert {r.serial_id for r in rows} == set(intake.serial_ids)
+        for r in rows:
+            assert r.purchase_ref is None
+            assert r.acquired_date == today
+            assert r.cost == Decimal("0")
+            assert r.status == "on_hand"
+
+        sell_consigned_unit(conn, serial_id=intake.serial_ids[0], expected_sku=intake.sku)
+        rows = {r.serial_id: r for r in get_serialized_unit_rows(conn, item.id)}
+        assert rows[intake.serial_ids[0]].status == "sold"
+        assert rows[intake.serial_ids[1]].status == "on_hand"
+
+    def test_purchased_serialized_rows_unchanged(self, conn):
+        from inventory.purchases import NewItemInput, PurchaseInput, PurchaseLineInput, save_purchase
+        from inventory.queries import get_serialized_unit_rows
+
+        res = save_purchase(
+            conn,
+            PurchaseInput(
+                purchase_date=date(2026, 6, 1), vendor_description="v",
+                total_amount_paid=Decimal("300000"), shipping_mode="none",
+                lines=[PurchaseLineInput(
+                    new_item=NewItemInput(name="Bought Watch", category_code="WATCHES", identity_mode="serialized"),
+                    quantity=2, pricing_mode="direct", price_entry_mode="total", price_value=Decimal("300000"),
+                )],
+            ),
+        )
+        item = get_item_by_sku(conn, res.lines[0].sku)
+        rows = get_serialized_unit_rows(conn, item.id)
+        assert len(rows) == 2
+        for r in rows:
+            assert r.purchase_ref == res.purchase_ref
+            assert r.acquired_date == date(2026, 6, 1)
+            assert r.cost == Decimal("150000")

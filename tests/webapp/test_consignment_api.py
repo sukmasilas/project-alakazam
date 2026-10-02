@@ -255,3 +255,17 @@ def test_consignor_reimbursements_page_renders(client):
     assert resp.status_code == 200
     assert "Consignor Reimbursements" in resp.text
     assert "consignor_reimbursements.js" in resp.text
+
+
+def test_item_detail_lists_consigned_units_with_null_purchase_ref(client):
+    consignor = _post_consignor(client, name="Detail Consignor")
+    intake = _post_intake(client, consignor["id"], name="Detail Consigned Watch", quantity=2)
+
+    detail = client.get(f"/api/items/{intake['sku']}")
+    assert detail.status_code == 200, detail.text
+    units = detail.json()["serialized_units"]
+    assert len(units) == 2
+    for u in units:
+        assert u["purchase_ref"] is None
+        assert u["cost"] == "0"  # money is always a JSON string
+        assert u["status"] == "on_hand"

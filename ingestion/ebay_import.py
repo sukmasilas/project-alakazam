@@ -342,6 +342,10 @@ def get_on_hand_serials_for_sku(conn: Connection, sku: str) -> list[dict]:
     item = get_item_by_sku(conn, sku)
     if item is None or item.identity_mode != "serialized":
         return []
+    # Guard: consigned items must not be sold via eBay import (no
+    # reimbursement record would be created) — integration deferred.
+    if item.consignor_id is not None:
+        return []
     units = get_serialized_unit_rows(conn, item.id)
     return [{"serial_id": u.serial_id, "cost": str(u.cost)} for u in units if u.status == "on_hand"]
 
@@ -385,6 +389,11 @@ def mark_row_matched(
     item = get_item_by_sku(conn, sku)
     if item is None:
         raise InvalidRowActionError(f"No item with SKU {sku!r}.")
+    if item.consignor_id is not None:
+        raise InvalidRowActionError(
+            f"Item {sku!r} is a consigned item — selling consigned items through eBay import isn't "
+            "supported yet. Use Item Detail's Mark as Sold, which records the consignor reimbursement."
+        )
 
     quantity = row["quantity"] or 1
     normalized_serials: Optional[list[str]] = None
@@ -478,7 +487,7 @@ def process_confirmed_rows(conn: Connection, batch_id: Optional[int] = None) -> 
         text(
             """
             SELECT r.id, r.ebay_transaction_id, r.item_title, r.order_number, r.quantity,
-                   r.matched_serial_ids, i.sku AS matched_sku, i.identity_mode
+                   r.matched_serial_ids, i.sku AS matched_sku, i.identity_mode, i.consignor_id
             FROM ebay_sales_rows r
             JOIN items i ON i.id = r.matched_item_id
             WHERE r.review_status = 'matched' AND (:batch_id IS NULL OR r.batch_id = :batch_id)
@@ -504,6 +513,18 @@ def process_confirmed_rows(conn: Connection, batch_id: Optional[int] = None) -> 
                 ).first()
                 if gated is None:
                     raise RowAlreadyProcessedError(row["id"])
+
+                # Guard: a consigned item must never be depleted here — the
+                # plain depletion would skip the consignor reimbursement
+                # record. Covers rows matched before mark_row_matched had
+                # the same guard. Raised inside the savepoint so the
+                # 'posted' flip rolls back and the row stays 'matched'.
+                if row["consignor_id"] is not None:
+                    raise InvalidRowActionError(
+                        f"Item {row['matched_sku']!r} is a consigned item — selling consigned items through "
+                        "eBay import isn't supported yet. Use Item Detail's Mark as Sold, which records "
+                        "the consignor reimbursement."
+                    )
 
                 if row["identity_mode"] == "fungible":
                     depletion = deplete_fungible(
@@ -544,7 +565,7 @@ def process_confirmed_rows(conn: Connection, batch_id: Optional[int] = None) -> 
                             {"row_id": row["id"], "unit_id": unit.id},
                         )
                         serial_ids_depleted.append(serial_id)
-        except (AlakazamError, RowAlreadyProcessedError) as exc:
+        except (AlakazamError, RowAlreadyProcessedError, InvalidRowActionError) as exc:
             conn.execute(
                 text("UPDATE ebay_sales_rows SET last_process_error = :err WHERE id = :id"),
                 {"err": str(exc), "id": row["id"]},
